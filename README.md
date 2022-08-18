@@ -1,7 +1,4 @@
-# BotfriendsWebchat Web Messenger
-
-The BotfriendsWebchat Web Messenger will add live web messaging to your website or web app.
-
+# BOTfriends X Webchat
 ## Usage
 
 ### Script Tag
