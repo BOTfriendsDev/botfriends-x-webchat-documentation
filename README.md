@@ -1034,6 +1034,21 @@ When `init()` is called without a `userId` and `jwt`, the UI will be initialized
 
 If however your use case requires that all users be logged in before they may send messages, then you should consider passing `userId` and `jwt` directly to the `init()` call upfront.
 
+### Automatic Welcome Message
+
+Some use-cases require to send a message to the user directly upon opening the web chat widget. This behavior can be implemented by listening to the `'widget:opened'` event, and then calling the `startConversation()` method, if the user is new to the chat:
+
+```javascript
+BotfriendsWebchat.on('widget:opened', function() {
+  var conversation = BotfriendsWebchat.getConversation()
+  var isNewUser = !conversation?.messages?.length
+  if (isNewUser) {
+    BotfriendsWebchat.startConversation()
+  }
+})
+```
+The connected bot needs to have a ‘WELCOME’ event added in the intent to be sent automatically. More information can be found in the [BOTfriends X docs](https://docs.botfriendsx.com/#/IM/Events?id=send-a-start-message-in-the-website-chat-welcome).
+
 ## Content Security Policy
 
 If your deployment requires [CSP compatibility](https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP), add the following meta tag to your configuration.
