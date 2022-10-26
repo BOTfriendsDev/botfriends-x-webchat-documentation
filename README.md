@@ -736,6 +736,7 @@ BotfriendsWebchat.init({
 ```
 
 If no language detection is enabled in BOTfriends X, the `beforeSend` delegate method can also be used to pass a language code to be used for intent detection. 
+The language codes (e.g. en, de, fr, es) you can use can be found in your NLU integration in BOTfriends X. Make sure to use only language codes that exist in your BOTfriends X project.
 
 ```javascript
 BotfriendsWebchat.init({
