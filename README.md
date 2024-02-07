@@ -1048,7 +1048,11 @@ BotfriendsWebchat.on('widget:opened', function() {
   }
 })
 ```
+#### v1 Projects
 The connected bot needs to have a ‘WELCOME’ event added in the intent to be sent automatically. More information can be found in the [BOTfriends X docs](https://docs.botfriendsx.com/#/IM/Events?id=send-a-start-message-in-the-website-chat-welcome).
+
+#### v2 Projects
+`BotfriendsWebchat.startConversation()` will automatically trigger the **Welcome Node** in the **Welcome Dialog**. More information can be found in the [BOTfriends X Knowledge Hub](https://knowledgehub.botfriendsx.com/#/BotBuilder/WorkWithDialogs?id=welcome-node).
 
 ## Content Security Policy
 
