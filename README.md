@@ -1075,8 +1075,8 @@ BotfriendsWebchat.init({
       const [element] = messageContainer.querySelectorAll(`[data-for=tooltip-${messageId}]`)
       if (element) {
         const textSpan = element.getElementsByClassName('message-item')[0]
-        const isMarkdown = message?.metadata?.isMarkdown
-        textSpan.innerHTML = isMarkdown ? `<i>${parsed}</i>` : parsed
+        const isKnowledgeBaseSource = message?.metadata?.isKnowledgeBaseSource
+        textSpan.innerHTML = isKnowledgeBaseSource ? `<i>${parsed}</i>` : parsed
         for (const child of textSpan.children) {
           child.style = `padding: 0px!important; margin: 0px!important`
           const hrefs = child.querySelectorAll('a')
