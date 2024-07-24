@@ -1054,6 +1054,50 @@ The connected bot needs to have a ‘WELCOME’ event added in the intent to be 
 #### v2 Projects
 `BotfriendsWebchat.startConversation()` will automatically trigger the **Welcome Node** in the **Welcome Dialog**. More information can be found in the [BOTfriends X Knowledge Hub](https://knowledgehub.botfriendsx.com/#/BotBuilder/WorkWithDialogs?id=welcome-node).
 
+### Enable Markdown in Webchat
+
+1. To enable display of Markdown Language in bot responses add the [markedjs](https://github.com/markedjs/marked) script to the html file:
+```html
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+```
+2. Add markdown parsing to the `delegate.beforeDisplay` method:
+
+```js
+BotfriendsWebchat.init({
+  // ...
+  delegate: {
+    beforeDisplay(message, data) {
+      // ...
+      const parsed = marked.parse(message.text)
+      const webMessenger = document.getElementById('web-messenger-container')
+      const messageContainer = webMessenger.contentWindow.document.getElementsByClassName('messages-container')[0]
+      const messageId = message?._id ?? ''
+      const [element] = messageContainer.querySelectorAll(`[data-for=tooltip-${messageId}]`)
+      if (element) {
+        const textSpan = element.getElementsByClassName('message-item')[0]
+        const isMarkdown = message?.metadata?.isMarkdown
+        textSpan.innerHTML = isMarkdown ? `<i>${parsed}</i>` : parsed
+        for (const child of textSpan.children) {
+          child.style = `padding: 0px!important; margin: 0px!important`
+          const hrefs = child.querySelectorAll('a')
+          for (const href of hrefs) {
+            href.setAttribute('target', '_blank')
+          }
+        }
+        const lists = textSpan.querySelectorAll('ul, ol')
+        for (const list of lists) {
+          list.style = 'padding-left: 16px;'
+        }
+      }
+      return message
+    }
+  }
+})
+```
+
+3. Add Markdown to your bot responses. Use the [Cheat Sheet](https://www.markdownguide.org/cheat-sheet/) to find the tags that match your needs
+
+
 ## Content Security Policy
 
 If your deployment requires [CSP compatibility](https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP), add the following meta tag to your configuration.
