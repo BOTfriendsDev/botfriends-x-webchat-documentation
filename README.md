@@ -1097,37 +1097,6 @@ BotfriendsWebchat.init({
 
 3. Add Markdown to your bot responses. Use the [Cheat Sheet](https://www.markdownguide.org/cheat-sheet/) to find the tags that match your needs
 
-### Disable Input-Field based on the triggered Bot-Node Name
-
-Every Bot-Message has the 'nodeName' property under the metadata (message.metadata.nodeName)
-
-1. To disable the Input-Field based on that property, add the following code to your Script
-
-```js
-BotfriendsWebchat.on('message:received', function(message, data) {
-  const webMessenger = document.getElementById('web-messenger-container')
-  const footer = webMessenger.contentWindow.document.getElementById('footer')
-  const inputField = footer.getElementsByClassName('message-input')[0]
-  if (message.metadata?.nodeName === 'BOTNODE_NAME') {
-    inputField?.disabled = true
-  } else {
-    inputField?.disabled = false
-  }
-});
-```
-
-2. Add the following code to the BotfirendsWebchat.init() Function
-
-```js
-const webMessenger = document.getElementById('web-messenger-container')
-const footer = webMessenger.contentWindow.document.getElementById('footer')
-const inputField = footer.getElementsByClassName('message-input')[0]
-const conversation = BotfriendsWebchat.getConversation()
-if (conversation?.messages.reverse()[0]?.metadata?.nodeName === 'BOTNODE_NAME') {
-  inputField.disabled = true
-}
-```
-
 ## Content Security Policy
 
 If your deployment requires [CSP compatibility](https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP), add the following meta tag to your configuration.
