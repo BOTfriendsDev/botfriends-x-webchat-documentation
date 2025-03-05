@@ -1097,6 +1097,56 @@ BotfriendsWebchat.init({
 
 3. Add Markdown to your bot responses. Use the [Cheat Sheet](https://www.markdownguide.org/cheat-sheet/) to find the tags that match your needs
 
+### System Message Metadata (V2)
+
+Every message sent by bot includes the following properties:
+
+- **nodeName**: Name of the bot node in which the response is maintained.
+
+The last bot message in a user-bot interaction contains additional details about the current state of the conversation:
+- **isAgentMessage**: Indicates whether the message was sent by a human agent.
+- **transactionId**: A unique ID for the user-bot interaction.
+- **sessionId**: The unique conversation ID of the user.
+- **currentNodeName**: The current node where the user is located.
+- **currentWorkflowName**: The current dialogue in which the user is engaged.
+
+You can access the metadata of a message through the `message.metadata` object within various message-related delegates or event listeners.
+
+### Example: Disable Input-Field based on specific Bot Node Message (V2)
+
+1. Write a function that allows access to the input field of the Botfriends webchat. 
+
+```js
+function getInputField () {
+  const webMessenger = document.getElementById('web-messenger-container')
+  const footer = webMessenger.contentWindow.document.getElementById('footer')
+  const inputField = footer.getElementsByClassName('message-input')[0]
+  return inputField
+}
+```
+
+2. In the `message:received` handler, add the logic for which bot node messages the input field should be disabled. 
+
+```js
+BotfriendsWebchat.on('message:received', function(message, data) {
+  const inputField = getInputField()
+  if (message.metadata?.nodeName === 'BOTNODE_NAME') {
+    inputField.disabled = true
+  } else {
+    inputField.disabled = false
+  }
+});
+```
+
+3. Add the following code to the end of the `BotfriendsWebchat.init()` function so that the logic for existing messages also works when the website chat is re-initialised. 
+
+```js
+const inputField = getInputField()
+if (conversation?.messages.reverse()[0]?.metadata?.nodeName === 'BOTNODE_NAME') {
+  inputField.disabled = true
+}
+```
+
 ## Content Security Policy
 
 If your deployment requires [CSP compatibility](https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP), add the following meta tag to your configuration.
