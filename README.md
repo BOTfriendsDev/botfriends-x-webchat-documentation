@@ -1182,6 +1182,41 @@ According to the channels you use, other domains may need to be added (these are
 Note that your CSP configuration should also include any domains used to host images or files sent in messages.
 If you require `blob:` to be excluded for `img-src`, you must disable the image upload feature via the [init settings](#initoptions).
 
+## Webchat WCAG / BFSG Compliance
+
+As the Smooch Web Messenger does not ensure accessibility to all contents of the chat, BOTfriends provides an additional script that can be added to the web page to **enhance the accessibility of the Smooch Web Messenger**.
+The chat widget and its content are made accessible to **keyboard-only navigation** and **screenreaders**.
+
+#### Steps to integrate the script:
+1. Add the script to the page html:
+```html
+<script src='https://www.cdn.botfriendsx.com/bfsg/bfsg.min.js'></script>
+```
+2. Initialize the WCAG/BFSG modifications:
+```html
+BotfriendsWebchatBFSG.init(BotfriendsWebchat)
+```
+
+Here an example with more context:
+```html
+  <script src='https://www.cdn.botfriendsx.com/bfsg/bfsg.min.js'></script>
+  <!-- Web messenger script: -->
+  <script>
+    !function (s, r, o) {
+      ...
+    }(window, document, "BotfriendsWebchat");
+    BotfriendsWebchat.init({
+      ...
+    }).then(function () {
+      ...
+      // WCAG/BFSG script init:
+      BotfriendsWebchatBFSG.init(BotfriendsWebchat)
+    })
+    ...
+  </script>
+```
+
+
 ## Acknowledgements
 
 https://github.com/lipis/flag-icon-css
