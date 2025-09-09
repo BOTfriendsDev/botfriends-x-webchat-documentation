@@ -1068,13 +1068,13 @@ BotfriendsWebchat.init({
   delegate: {
     beforeDisplay(message, data) {
       // ...
+      if (!message.text) {
+        return message
+      }
       message.text = message.text.replaceAll('\n', '<br>')
       const parsed = marked.parse(message.text)
       const webMessenger = document.getElementById('web-messenger-container')
       const messageContainer = webMessenger.contentWindow.document.getElementsByClassName('messages-container')[0]
-      if (!messageContainer) {
-        return message
-      }
       const messageId = message?._id ?? ''
       const [element] = messageContainer.querySelectorAll(`[data-for=tooltip-${messageId}]`)
       if (element) {
