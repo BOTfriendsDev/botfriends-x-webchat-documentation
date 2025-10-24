@@ -1201,7 +1201,7 @@ The chat widget and its content are made accessible to **keyboard-only navigatio
 BotfriendsWebchatBFSG.init(BotfriendsWebchat)
 ```
 
-Here an example with more context:
+### Example:
 ```html
   <script src='https://www.cdn.botfriendsx.com/bfsg/bfsg.min.js'></script>
   <!-- Web messenger script: -->
@@ -1218,6 +1218,34 @@ Here an example with more context:
     })
     ...
   </script>
+```
+
+### Accessibility Text Customization
+The script automatically applies the aria-live attribute to selected interface elements to improve screen reader support.
+Developers can override the default text values of these attributes by supplying a configuration object to the init() method.
+
+To customize the text, include a customText property in the initialization parameters.
+This property should contain key–value pairs, where each key corresponds to an element identifier and each value defines the associated announcement text.
+
+Available Customization Keys
+| Option            | Default value         |
+| ----------------- | --------------------- |
+| bfsgChatHistory   | Chat history          |
+| bfsgChatWindow    | Chat Window           |
+| bfsgCloseChat     | Close Chat            |
+| bfsgIntroPanel    | Intro Panel           |
+| bfsgOpenWebchat   | Open webchat          |
+| bfsgResetchat     | Reset Chat            |
+| bfsgSays          | says                  |
+| bfsgSkipToInput   | Skip to message input |
+| bfsgUser          | User                  |
+| bfsgWebchat       | Webchat               |
+| bfsgWebchatClosed | Webchat closed        |
+| bfsgWebchatOpened | Webchat opened        |
+
+### Example:
+```html
+      BotfriendsWebchatBFSG.init(BotfriendsWebchat, customText: {bfsgChatHistory: 'History'})
 ```
 
 
