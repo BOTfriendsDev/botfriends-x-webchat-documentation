@@ -1227,7 +1227,7 @@ Developers can override the default text values of these attributes by supplying
 To customize the text, include a customText property in the initialization parameters.
 This property should contain key–value pairs, where each key corresponds to an element identifier and each value defines the associated announcement text.
 
-Available Customization Keys
+**Available Customization Keys**
 | Option            | Default value         |
 | ----------------- | --------------------- |
 | bfsgChatHistory   | Chat history          |
