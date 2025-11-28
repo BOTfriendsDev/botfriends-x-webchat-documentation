@@ -945,7 +945,7 @@ data = {
 #### widget:opened
 
 ```javascript
-// This event triggers when the widget is opened
+// This event triggers when the widget is opened (not supported in embedded mode)
 BotfriendsWebchat.on('widget:opened', function() {
     console.log('Widget is opened!');
 });
@@ -954,7 +954,7 @@ BotfriendsWebchat.on('widget:opened', function() {
 #### widget:closed
 
 ```javascript
-// This event triggers when the widget is closed
+// This event triggers when the widget is closed (not supported in embedded mode)
 BotfriendsWebchat.on('widget:closed', function() {
     console.log('Widget is closed!');
 });
