@@ -1068,7 +1068,7 @@ BotfriendsWebchat.init({
   delegate: {
     beforeDisplay(message, data) {
       // ...
-      if (!message.text) {
+      if (!message.text || message.role == 'appUser') {
         return message
       }
       message.text = message.text.replaceAll('\n', '<br>')
