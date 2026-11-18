@@ -1,1254 +1,733 @@
-# BOTfriends X Webchat
-## Usage
+# Botfriends Agent Chat Widget
 
-### Script Tag
+The Agent Chat Widget embeds a Botfriends X chat in your website. You add one
+script tag to your page; everything else is optional.
 
-Add the following code towards the end of the `head` section on your page and replace `<integration-id>` with your integration id at the end of the script.
+This guide starts with the minimal setup and then adds one capability per step:
 
-<!-- prettier-ignore -->
+1. [Add the embed snippet](#step-1-add-the-embed-snippet) – the chat appears on your page.
+2. [Customize the widget](#step-2-customize-the-widget) – colors, texts, and behavior.
+3. [Control the widget from your page](#step-3-control-the-widget-from-your-page) –
+   open the chat, send messages, react to events.
+4. [Initialize the widget yourself](#step-4-initialize-the-widget-yourself) – decide
+   when the widget starts.
+5. [Embed the chat in a page element](#step-5-embed-the-chat-in-a-page-element) –
+   inline or fullscreen instead of floating.
+6. [Pass user data to the bot](#step-6-pass-user-data-to-the-bot) – metadata and
+   signed metadata.
+7. [Intercept messages with hooks](#step-7-intercept-messages-with-hooks) – run
+   your own code before messages are shown or sent.
+
+The [reference](#reference) at the end lists every option, method, and event.
+
+## Step 1: Add the embed snippet
+
+Copy the embed snippet from the Botfriends X project configuration and paste it
+into the page where the chat should appear:
+
 ```html
-<script>
-    !function(s,r,o){var p,a,i,c=[],u=[];function e(){try{var e;if((e="string"==typeof this.response?JSON.parse(this.response):this.response).url){var t=r.getElementsByTagName("script")[0],n=r.createElement("script");n.async=!0,n.src=e.url,t.parentNode.insertBefore(n,t)}}catch(e){}}s[o]={init:function(){p=arguments;var t={then:function(e){return u.push({type:"t",next:e}),t},catch:function(e){return u.push({type:"c",next:e}),t}};return t},on:function(){c.push(arguments)},render:function(){a=arguments},destroy:function(){i=arguments}},s.__onWebMessengerHostReady__=function(e){if(delete s.__onWebMessengerHostReady__,s[o]=e,p)for(var t=e.init.apply(e,p),n=0;n<u.length;n++){var r=u[n];t="t"===r.type?t.then(r.next):t.catch(r.next)}a&&e.render.apply(e,a),i&&e.destroy.apply(e,i);for(n=0;n<c.length;n++)e.on.apply(e,c[n])};var t=new XMLHttpRequest;t.addEventListener("load",e),t.open("GET","https://www.cdn.botfriendsx.com/loader.json",!0),t.responseType="json",t.send()}(window,document,"BotfriendsWebchat");
-</script>
+<script
+  defer
+  src="https://webchat.botfriendsx.com/scripts/v1/widget.js"
+  data-webchat-id="YOUR_WEBCHAT_ID"
+  data-auto-init="true"
+></script>
 ```
 
-then initialize the Web Messenger by placing this snippet towards the end of the `body` section of your page.
+That is all you need. When the page loads, the chat launcher appears in the
+corner of the page with the appearance and texts configured in Botfriends X.
+
+What the snippet does:
+
+- `src` loads the widget. The URL is environment-specific; use the exact URL from
+  Botfriends X and do not copy a development or staging URL into production.
+- `data-webchat-id` identifies your Botfriends X webchat.
+- `data-auto-init="true"` starts the widget automatically.
+- `defer` loads the script without blocking your page.
+
+Add the snippet only once per page.
+
+### The three global objects
+
+The widget can be used without writing any JavaScript. If you do want to
+configure or control it from JavaScript, the widget uses three global objects on
+`window`. Each has its own job:
+
+| Global object                    | What it is for                                                                                                                          | Who creates it                                                          |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `window.BotfriendsWidgetOptions` | Settings for the automatically started widget ([Step 2](#step-2-customize-the-widget)).                                                 | **You**, before the widget script runs. Optional.                       |
+| `window.BotfriendsWidgetApi`     | Starts and removes the widget: `init(...)`, `destroy()` ([Step 4](#step-4-initialize-the-widget-yourself)).                             | The widget script, as soon as it has loaded.                            |
+| `window.BotfriendsWidget`        | The running widget. Use it to open the chat, send messages, and listen to events ([Step 3](#step-3-control-the-widget-from-your-page)). | The widget, each time it starts (automatically or through `init(...)`). |
+
+In short: `BotfriendsWidgetOptions` is what you **hand in**, `BotfriendsWidgetApi`
+**starts** the widget, and `BotfriendsWidget` is the **running** widget you control.
+
+There is only ever one widget per page. Starting it again replaces the previous
+one, and `window.BotfriendsWidget` then refers to the new widget.
+
+## Step 2: Customize the widget
+
+By default, the widget uses the configuration from Botfriends X. To override
+individual settings on a specific page, define `window.BotfriendsWidgetOptions`
+**before** the embed snippet:
 
 ```html
 <script>
-    BotfriendsWebchat.init({integrationId: '<integration-id>'}).then(function() {
-        // Your code after init is complete
+  window.BotfriendsWidgetOptions = {
+    appearance: {
+      brandColor: "#2457a6",
+      userMessageColor: "#2457a6",
+    },
+    localization: {
+      defaultLanguage: "en",
+    },
+  };
+</script>
+<script
+  defer
+  src="https://webchat.botfriendsx.com/scripts/v1/widget.js"
+  data-webchat-id="YOUR_WEBCHAT_ID"
+  data-auto-init="true"
+></script>
+```
+
+You only need to list the settings you want to change. Everything else keeps
+its Botfriends X value. Settings from your page take precedence over the
+Botfriends X configuration, which takes precedence over the widget's defaults.
+Invalid or unsupported settings are ignored and reported in the browser console.
+
+All available settings are listed in the
+[configuration reference](#configuration-options).
+
+`window.BotfriendsWidgetOptions` is only read when the widget starts
+automatically. If you start the widget yourself ([Step 4](#step-4-initialize-the-widget-yourself)),
+pass the same object to `init(...)` instead.
+
+## Step 3: Control the widget from your page
+
+Once the widget has started, `window.BotfriendsWidget` gives you access to it.
+With the embed snippet from Step 1, the widget has started by the time the
+page's `DOMContentLoaded` event fires:
+
+```html
+<button id="help-button">Chat with us</button>
+<script>
+  window.addEventListener("DOMContentLoaded", () => {
+    const widget = window.BotfriendsWidget;
+
+    document.getElementById("help-button").addEventListener("click", () => {
+      widget.open({ focus: true });
     });
+  });
 </script>
 ```
 
-## Browser support
+Common actions:
 
-Web Messenger supports all popular browsers.
+```js
+const widget = window.BotfriendsWidget;
 
-#### Desktop versions
+widget.open({ focus: true }); // open the chat panel and move focus into it
+widget.close(); // close the chat panel
+widget.sendMessage("I need help with my order.");
 
--   Chrome: Latest and one major version behind
--   Edge: Latest and one major version behind
--   Firefox: Latest and one major version behind
--   Internet Explorer: 11+
--   Safari: Latest and one major version behind
+widget.hide(); // hide the whole widget, including the launcher
+widget.show(); // show it again
+```
 
-#### Mobile versions
+`open()`/`close()` control the chat panel. `show()`/`hide()` control whether the
+widget is visible on the page at all.
 
--   Stock browser on Android 4.1+
--   Safari on iOS 8+
+To change settings while the widget is running, use `updateConfig(...)`. It
+accepts the same settings as `window.BotfriendsWidgetOptions`:
 
-#### Other browsers
+```js
+window.BotfriendsWidget.updateConfig({
+  appearance: { brandColor: "#0a7d4f" },
+});
+```
 
-Web Messenger is likely compatible with other and older browsers but we only test against the versions above.
+To react to what happens in the chat, subscribe to an event. `on(...)` returns a
+function that removes the listener again:
 
-## API
+```js
+const unsubscribe = window.BotfriendsWidget.on("message:received", (event) => {
+  console.log("Received chat message:", event.detail);
+});
 
-### Individual functions
+// Later, when you no longer need the listener:
+unsubscribe();
+```
 
-#### init(options)
+All methods and events are listed in the [JavaScript API reference](#javascript-api).
 
-Initializes the BotfriendsWebchat widget in the web page using the specified options. It returns a promise that will resolve when the Web Messenger is ready. Note that except`on` and `off`, all methods needs to be called after a successful `init`.
+## Step 4: Initialize the widget yourself
 
-##### Options
+Use this when your page needs to decide **when** the widget starts, for example
+only after a cookie banner was accepted or only on certain routes.
 
-| Option                           | Optional? | Default value                 | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| -------------------------------- | --------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| appId                            | Yes       | -                             | Your app id                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| integrationId                    | No        | -                             | Your integration id                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| region                           | Yes       | -                             | The target region in which the app is located.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| userId                           | Yes       | -                             | Optional. User's id, which can be passed in `init()` as an alternative to `login()` (see [below](#authenticating-the-user-init-vs-login))                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| jwt                              | Yes       | -                             | Optional. User's authentication token, which can be passed in `init()` as an alternative to `login()` (see [below](#authenticating-the-user-init-vs-login))                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| authCode                         | Yes       | -                             | An auth code for linking to an existing conversation                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| locale                           | Yes       | `en-US`                       | Locale used for date formatting using the `<language>-<COUNTRY>` format. Language codes can be found [here](https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes) and country codes [here](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2). <br /> **Note 1 : ** The country part is optional, and if a country is either not recognized or supported, it will fallback to using the generic language. If the language isn't supported, it will fallback to `en-US`. <br /> **Note 2:** this is _only_ used for date formatting and doesn't provide built-in translations for Web Messenger. |
-| soundNotificationEnabled         | Yes       | `true`                        | Enables the sound notification for new messages                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| imageUploadEnabled               | Yes       | `true`                        | Enables the image upload feature. (deprecated: use menuItems.imageUpload; if this option is `false`, it will disable `menuItems.imageUpload` and `menuItems.fileUpload`)                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| fixedIntroPane                   | Yes       | `false`                       | When enabled, the introduction pane will be pinned at the top of the conversation instead of scrolling with it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| embedded                         | Yes       | False                         | Tells the widget it will be embedded. (see Embedded section below)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| displayStyle                     | Yes       | `button`                      | Choose how the messenger will appear on your website. Must be either `button` or `tab`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| buttonIconUrl                    | Yes       | -                             | When the `displayStyle` is `button`, you have the option of selecting your own button icon. The image must be at least 200 x 200 pixels and must be in either JPG, PNG, or GIF format.                                                                                                                                                                                                                                                                                                                                                                                                          |
-| buttonWidth                      | Yes       | `58px`                        | When the `displayStyle` is `button`, you have the option of specifying the button width.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| buttonHeight                     | Yes       | `58px`                        | When the `displayStyle` is `button`, you have the option of specifying the button height.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| businessName                     | Yes       | -                             | A custom business name.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| businessIconUrl                  | Yes       | -                             | A custom business icon url. The image must be at least 200 x 200 pixels and must be in either JPG, PNG, or GIF format.                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| backgroundImageUrl               | Yes       | -                             | A background image url for the conversation. Image will be tiled to fit the window.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| integrationOrder                 | Yes       | -                             | Array of integration IDs. When set, only integrations from this list will be displayed. If an empty array is used, no integrations will be displayed. _Note_: Listing an integration in the array doesn't guarantee that it will be displayed in the Web Messenger.                                                                                                                                                                                                                                                                                                                             |
-| customColors                     | Yes       | [See below.](#customcolors)   | Colors used in the Web Messenger UI.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| customText                       | Yes       | See the example below         | Strings used in the Web Messenger UI. You can use these to either customize the text or translate it. _Note_: Some strings include variables (surrounded by `{}`) which must remain in your customized text.                                                                                                                                                                                                                                                                                                                                                                                    |
-| menuItems                        | Yes       | [See below.](#menuitems)      | Choose menu items.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| notificationChannelPromptEnabled | Yes       | `true`                        | Enables displaying a prompt to new users after their first message to suggest linking their chat instance with their other 3rd-party apps.                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| browserStorage                   | Yes       | `localStorage`                | Choose the storage type to use for storing user identity in the browser. Must be either `localStorage` or `sessionStorage`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| delegate                         | Yes       | `undefined`                   | Sets a delegate on the conversation. See the [delegate](#delegate) section for more details.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| prechatCapture                   | Yes       | [See below.](#prechatcapture) | Enables automatically capturing a user's name and email via a form before the start of a conversation. Disables the chat input until the form has been submitted.                                                                                                                                                                                                                                                                                                                                                                                                                               |
+Remove `data-webchat-id` and `data-auto-init` from the script tag. The script then
+only loads the widget and provides `window.BotfriendsWidgetApi`. Start the widget
+with `init(...)` when you are ready:
 
-##### `region`
+```html
+<script
+  defer
+  src="https://webchat.botfriendsx.com/scripts/v1/widget.js"
+></script>
+<script>
+  window.addEventListener("DOMContentLoaded", () => {
+    const widget = window.BotfriendsWidgetApi.init("YOUR_WEBCHAT_ID", {
+      appearance: {
+        brandColor: "#2457a6",
+      },
+    });
 
-BotfriendsWebchat is available in the following regions:
+    widget.open({ focus: true });
+  });
+</script>
+```
 
-| Region         | Region Identifier   |
-| -------------- | ------------------- |
-| United States  | _Leave unspecified_ |
-| European Union | `eu-1`              |
+`init(webchatId, options?, mountOptions?)`:
 
-##### `customColors`
+- `webchatId` (required): your Botfriends X webchat ID.
+- `options` (optional): the same settings as `window.BotfriendsWidgetOptions` in Step 2.
+- `mountOptions` (optional): where and how the widget is placed on the page, see
+  [Step 5](#step-5-embed-the-chat-in-a-page-element).
 
-| Option            | Optional? | Default value | Description                                                                                                                           |
-| ----------------- | --------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| brandColor        | Yes       | `65758e`      | This color will be used in the messenger header and the button or tab in idle state. Must be a 3 or 6-character hexadecimal color.    |
-| conversationColor | Yes       | `0099ff`      | This color will be used for customer messages, quick replies and actions in the footer. Must be a 3 or 6-character hexadecimal color. |
-| actionColor       | Yes       | `0099ff`      | This color will be used for call-to-actions inside your messages. Must be a 3 or 6-character hexadecimal color.                       |
+`init(...)` returns the running widget. This is the same object that is also
+available as `window.BotfriendsWidget`, so all methods from Step 3 work on it.
 
-##### `customText`
+To remove the widget from the page, call `window.BotfriendsWidgetApi.destroy()`.
+Call `init(...)` again to start a new widget.
 
-The list of localizable strings. These strings can be modified. _If an option is not given a custom string, the default value will be used._
+## Step 5: Embed the chat in a page element
 
-| Option                                   | Default value                                                                                                                                                                                                        |
-| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| actionPaymentCompleted                   | Payment Completed                                                                                                                                                                                                    |
-| actionPaymentError                       | An error occurred while processing the card. `<br>` Please try again or use a different card.                                                                                                                        |
-| actionPostbackError                      | An error occurred while processing your action. Please try again.                                                                                                                                                    |
-| clickToRetry                             | Message not delivered. Click to retry.                                                                                                                                                                               |
-| clickToRetryForm                         | Form not submitted. Click anywhere on the form to retry.                                                                                                                                                             |
-| connectNotificationText                  | Give us a way to reach out:                                                                                                                                                                                          |
-| connectNotificationSingleText            | Be notified when you get a reply.                                                                                                                                                                                    |
-| connectNotificationSingleButtonText      | Turn on `<name>` notifications                                                                                                                                                                                       |
-| connectNotificationOthersText            | others                                                                                                                                                                                                               |
-| conversationTimestampHeaderFormat        | MMMM D YYYY, h:mm A                                                                                                                                                                                                  |
-| couldNotConnect                          | Couldn't connect. You can {retry}.                                                                                                                                                                                   |
-| couldNotConnectInner                     | retry connecting now                                                                                                                                                                                                 |
-| couldNotConnectWithRetry                 | Couldn't connect. We'll keep retrying, or you can {retry}.                                                                                                                                                           |
-| couldNotConnectWithRetryInner            | try now                                                                                                                                                                                                              |
-| emailChangeAddress                       | Change my email                                                                                                                                                                                                      |
-| emailDescription                         | To be notified by email when you get a reply, enter your email address.                                                                                                                                              |
-| emailFieldLabel                          | Your email                                                                                                                                                                                                           |
-| emailFieldPlaceholder                    | Your email address                                                                                                                                                                                                   |
-| emailFormButton                          | Continue                                                                                                                                                                                                             |
-| fetchHistory                             | Load more                                                                                                                                                                                                            |
-| fetchingHistory                          | Retrieving history...                                                                                                                                                                                                |
-| fileTooLargeError                        | Max file size limit exceeded ({size})                                                                                                                                                                                |
-| fileTypeError                            | Unsupported file type.                                                                                                                                                                                               |
-| formErrorInvalidEmail                    | Email is invalid                                                                                                                                                                                                     |
-| formErrorNoLongerThan                    | Must contain no more than ({characters}) characters                                                                                                                                                                  |
-| formErrorNoShorterThan                   | Must contain at least ({characters}) characters                                                                                                                                                                      |
-| formErrorUnknown                         | This doesn't look quite right                                                                                                                                                                                        |
-| formFieldSelectPlaceholderFallback       | Choose one...                                                                                                                                                                                                        |
-| frontendEmailChannelDescription          | To talk to us using email just send a message to our email address and we\'ll reply shortly:                                                                                                                         |
-| headerText                               | How can we help?                                                                                                                                                                                                     |
-| imageClickToReload                       | Click to reload image.                                                                                                                                                                                               |
-| imageClickToView                         | Click to view {size} image.                                                                                                                                                                                          |
-| imagePreviewNotAvailable                 | Preview not available.                                                                                                                                                                                               |
-| inputPlaceholder                         | Type a message...                                                                                                                                                                                                    |
-| inputPlaceholderBlocked                  | Complete the form above...                                                                                                                                                                                           |
-| introAppText                             | Message us below or from your favorite app.                                                                                                                                                                          |
-| introductionText                         | We\'re here to talk, so ask us anything!                                                                                                                                                                             |
-| lineChannelDescription                   | To talk to us using LINE, scan this QR code using the LINE app and send us a message.                                                                                                                                |
-| linkError                                | An error occurred when attempting to generate a link for this channel. Please try again.                                                                                                                             |
-| locationNotSupported                     | Your browser does not support location services or it’s been disabled. Please type your location instead.                                                                                                            |
-| locationSecurityRestriction              | This website cannot access your location. Please type your location instead.                                                                                                                                         |
-| locationSendingFailed                    | Could not send location                                                                                                                                                                                              |
-| locationServicesDenied                   | This website cannot access your location. Allow access in your settings or type your location instead.                                                                                                               |
-| messageError                             | An error occured while sending your message. Please try again.                                                                                                                                                       |
-| messageIndicatorTitlePlural              | (`{count}`) New messages                                                                                                                                                                                             |
-| messageIndicatorTitleSingular            | (`{count}`) New message                                                                                                                                                                                              |
-| messageRelativeTimeDay                   | `{value}`d ago                                                                                                                                                                                                       |
-| messageRelativeTimeHour                  | `{value}`h ago                                                                                                                                                                                                       |
-| messageRelativeTimeJustNow               | Just now                                                                                                                                                                                                             |
-| messageRelativeTimeMinute                | `{value}`m ago                                                                                                                                                                                                       |
-| messageTimestampFormat                   | h:mm A                                                                                                                                                                                                               |
-| messageSending                           | Sending...                                                                                                                                                                                                           |
-| messageDelivered                         | Delivered                                                                                                                                                                                                            |
-| messengerChannelDescription              | Connect your Facebook Messenger account to be notified when you get a reply and continue the conversation on Facebook Messenger.                                                                                     |
-| notificationSettingsChannelsDescription  | You can also talk to us from your favorite app or service.                                                                                                                                                           |
-| notificationSettingsChannelsTitle        | Other Channels                                                                                                                                                                                                       |
-| notificationSettingsConnected            | Connected                                                                                                                                                                                                            |
-| notificationSettingsConnectedAs          | Connected as `{username}`                                                                                                                                                                                            |
-| prechatCaptureGreetingText               | Hi there 👋\nTo start off, we\'d like to know a little bit more about you:                                                                                                                                           |
-| prechatCaptureNameLabel                  | Your name                                                                                                                                                                                                            |
-| prechatCaptureNamePlaceholder            | Type your name...                                                                                                                                                                                                    |
-| prechatCaptureEmailLabel                 | Email                                                                                                                                                                                                                |
-| prechatCaptureEmailPlaceholder           | name@company.com                                                                                                                                                                                                     |
-| prechatCaptureConfirmationText           | Thanks for that! What can we help you with?                                                                                                                                                                          |
-| prechatCaptureMailgunLinkingConfirmation | You\'ll be notified here and by email at {email} once we reply.                                                                                                                                                      |
-| sendButtonText                           | Send                                                                                                                                                                                                                 |
-| settingsHeaderText                       | Settings                                                                                                                                                                                                             |
-| shareLocation                            | Share location                                                                                                                                                                                                       |
-| smsBadRequestError                       | We were unable to communicate with this number. Try again or use a different one.                                                                                                                                    |
-| smsCancel                                | Cancel                                                                                                                                                                                                               |
-| smsChangeNumber                          | Change my number                                                                                                                                                                                                     |
-| smsChannelDescription                    | Connect your SMS number to be notified when you get a reply and continue the conversation over SMS.                                                                                                                  |
-| smsChannelPendingDescription             | Check your messages at `{number}` to confirm your phone number.                                                                                                                                                      |
-| smsContinue                              | Continue                                                                                                                                                                                                             |
-| smsInvalidNumberError                    | Your phone number isn\'t valid. Please try again.                                                                                                                                                                    |
-| smsLinkCancelled                         | Link to `{appUserNumber}` was cancelled.                                                                                                                                                                             |
-| smsLinkPending                           | Pending                                                                                                                                                                                                              |
-| smsPingChannelError                      | There was an error sending a message to your number.                                                                                                                                                                 |
-| smsSendText                              | Send me a text                                                                                                                                                                                                       |
-| smsStartTexting                          | Start Texting                                                                                                                                                                                                        |
-| smsTooManyRequestsError                  | A connection for that number was requested recently. Please try again in {minutes} minutes.                                                                                                                          |
-| smsTooManyRequestsOneMinuteError         | A connection for that number was requested recently. Please try again in 1 minute.                                                                                                                                   |
-| smsUnhandledError                        | Something went wrong. Please try again.                                                                                                                                                                              |
-| tapToRetry                               | Message not delivered. Tap to retry.                                                                                                                                                                                 |
-| tapToRetryForm                           | Form not submitted. Tap anywhere on the form to retry.                                                                                                                                                               |
-| telegramChannelDescription               | Connect your Telegram account to be notified when you get a reply and continue the conversation on Telegram                                                                                                          |
-| uploadDocument                           | Upload document                                                                                                                                                                                                      |
-| uploadInvalidError                       | Invalid file                                                                                                                                                                                                         |
-| uploadPhoto                              | Upload photo                                                                                                                                                                                                         |
-| uploadVirusError                         | A virus was detected in your file and it has been rejected                                                                                                                                                           |
-| unsupportedMessageType                   | Unsupported message type.                                                                                                                                                                                            |
-| unsupportedActionType                    | Unsupported action type.                                                                                                                                                                                             |
-| viberChannelDescription                  | Connect your Viber account to be notified when you get a reply and continue the conversation on Viber. To get started, scan the QR code using the Viber app.                                                         |
-| viberChannelDescriptionMobile            | Connect your Viber account to be notified when you get a reply and continue the conversation on Viber. To get started, install the Viber app and tap Connect.                                                        |
-| viberQRCodeError                         | An error occurred while fetching your Viber QR code. Please try again.                                                                                                                                               |
-| wechatChannelDescription                 | Connect your WeChat account to be notified when you get a reply and continue the conversation on WeChat. To get started, scan this QR code using the WeChat app.                                                     |
-| wechatChannelDescriptionMobile           | Connect your WeChat account to be notified when you get a reply and continue the conversation on WeChat. To get started, save this QR code image and upload it `<a href=\'weixin://dl/scan\'>`QR code scanner`</a>`. |
-| wechatQRCodeError                        | An error occurred while fetching your WeChat QR code. Please try again.                                                                                                                                              |
-| whatsappChannelDescriptionDesktop        | Sync your account to WhatsApp by scanning the QR code or clicking the link below.\nThen, send the pre-populated message to validate the sync request. (Your code: {{code}}).                                         |
-| whatsappChannelDescriptionMobile         | Sync your account to WhatsApp by clicking the link below.\nThen, send the pre-populated message to validate the sync request. (Your code: {{code}}).                                                                 |
-| whatsappLinkingError                     | An error occurred while fetching your WhatsApp linking information. Please try again.                                                                                                                                |
+By default, the widget floats in a corner of the page. To show the chat inside
+an element of your page instead, pass that element as `mountOptions.container`
+to `init(...)`. Embedded mode fills the element's width and height, so give the
+element a size:
 
-[See below](#example) for an example.
+```html
+<div id="support-chat" class="support-chat"></div>
+<script
+  defer
+  src="https://webchat.botfriendsx.com/scripts/v1/widget.js"
+></script>
+<script>
+  window.addEventListener("DOMContentLoaded", () => {
+    const container = document.getElementById("support-chat");
 
-##### `menuItems`
+    const widget = window.BotfriendsWidgetApi.init(
+      "YOUR_WEBCHAT_ID",
+      {},
+      { container },
+    );
 
-| Option        | Optional? | Default value | Description                           |
-| ------------- | --------- | ------------- | ------------------------------------- |
-| imageUpload   | Yes       | `true`        | Enables the image upload menu item.   |
-| fileUpload    | Yes       | `true`        | Enables the file upload menu item.    |
-| shareLocation | Yes       | `true`        | Enables the share location menu item. |
+    widget.open();
+  });
+</script>
+```
 
-[See below](#example) for an example.
+```css
+.support-chat {
+  width: 100%;
+  height: 600px;
+}
+```
 
-##### `prechatCapture`
+For a fullscreen chat, make the container fill the viewport. There is no
+separate fullscreen setting; your page's CSS controls the size:
 
-| Option             | Optional? | Default value | Description                                                                                                                                                            |
-| ------------------ | --------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| avatarUrl          | Yes       | `undefined`   | Sets the URL of the avatar to use for the automatic reply to the prechat capture messages.                                                                             |
-| enabled            | Yes       | `false`       | Enables the prechat capture experience.                                                                                                                                |
-| enableEmailLinking | Yes       | `true`        | Automatically links the user's email to the app's Mailgun integration if it exists. If the property `fields` is defined, the first field of type `email` will be used. |
-| fields             | Yes       | -             | Overrides the default Prechat Capture fields to define a custom form.                                                                                                  |
+```css
+.support-chat {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  width: 100vw;
+  height: 100dvh;
+}
+```
 
-[beforeSend delegate](#beforesend) will apply to the user's submitted message.
+The container must be an `HTMLElement`. In embedded mode, the launcher button is
+hidden by default; set `showLauncher: true` in `mountOptions` to display it.
 
-[See below](#example) for an example.
+## Step 6: Pass user data to the bot
 
-`prechatCapture` uses the following [`customText`](#customText) options:
+You can send additional data about the visitor or the page along with each
+message, for example a customer number. There are two ways, which can be
+combined:
 
-| Option                                   | Description                                                                   |
-| ---------------------------------------- | ----------------------------------------------------------------------------- |
-| prechatCaptureGreetingText               | Text for the initial greeting message.                                        |
-| prechatCaptureNameLabel                  | Label displayed for the default form's first field.                           |
-| prechatCaptureNamePlaceholder            | Placeholder for the default form's first field.                               |
-| prechatCaptureEmailLabel                 | Label displayed for the default form's second field.                          |
-| prechatCaptureEmailPlaceholder           | Placeholder for the default form's second field.                              |
-| prechatCaptureConfirmationText           | Text for the confirmation message sent when the form is completed.            |
-| prechatCaptureMailgunLinkingConfirmation | Text for the notification message when a user has linked their email address. |
+- **Metadata**: plain values, set in the browser. Simple, but not verified.
+- **Signed metadata (JWT)**: values signed by your server. The gateway verifies
+  them before passing them to the bot.
 
-##### Example
+### Metadata
 
-```javascript
-var initPromise = BotfriendsWebchat.init({
-    integrationId: '<integration-id>',
-    // Leave unspecified for US region (default)
-    region: 'eu-1',
-    // For authenticated mode
-    jwt: 'your_jwt',
-    userId: 'user_id',
-    locale: 'en-US',
-    customColors: {
-        brandColor: '65758e',
-        conversationColor: '65758e',
-        actionColor: '65758e',
+Pass JSON-compatible values under `integration.metadata`:
+
+```js
+const widget = window.BotfriendsWidgetApi.init("YOUR_WEBCHAT_ID", {
+  integration: {
+    metadata: {
+      customerId: "123",
     },
-    menuItems: {
-        imageUpload: true,
-        fileUpload: true,
-        shareLocation: true
+  },
+});
+```
+
+This works the same way in `window.BotfriendsWidgetOptions` and
+`updateConfig(...)`. The widget also adds the current full page URL, including
+its query string and fragment, to outgoing messages.
+
+Things to know:
+
+- Metadata and the page URL are unsigned and visible to the receiving
+  conversation. Do not include secrets, access tokens, or other sensitive values.
+- The complete metadata object is limited to 16 KiB of UTF-8 JSON and eight
+  nested object/array levels. If your values and the page URL together exceed the
+  limit, your values are omitted for that message. If the URL alone exceeds the
+  limit, the metadata field is omitted.
+- Invalid metadata is ignored with a console warning instead of blocking a
+  message. An invalid `updateConfig(...)` call keeps the previous valid settings.
+
+### Signed metadata (JWT)
+
+Use `integration.metadataJWT` when the bot must be able to trust the values. Your
+server signs the values; the gateway verifies the signature and forwards only
+verified values to the bot.
+
+**1. Create the token on your server.** Sign it with the `HS256` algorithm using
+the signing secret for your webchat. If you have not received a signing secret,
+request it through your usual secure Botfriends X provisioning channel. Never
+put the signing secret in browser JavaScript, the embed snippet, or a public
+repository; only the signed token may be sent to the browser.
+
+The token payload must contain:
+
+- `projectId`: the ID of the Botfriends X project that owns the webchat.
+- `metadata`: a JSON object with the values to pass to the bot (same size limits
+  as above).
+
+Example using the `jsonwebtoken` package:
+
+```js
+const jwt = require("jsonwebtoken");
+
+const metadataJWT = jwt.sign(
+  {
+    projectId: "YOUR_PROJECT_ID",
+    metadata: {
+      customerId: "123",
+      customerTier: "gold",
     },
-    fixedIntroPane: false,
-    prechatCapture: {
-        avatarUrl: 'http://domain.com/images/avatar.png',
-        enabled: true,
-        enableEmailLinking: true,
-        fields: [
-            {
-                type: 'email',
-                name: 'email',
-                label: 'Email',
-                placeholder: 'your@email.com'
+  },
+  process.env.WEBCHAT_METADATA_JWT_SECRET,
+  {
+    algorithm: "HS256",
+    expiresIn: "5m",
+  },
+);
+```
+
+Standard `exp` and `nbf` claims are checked when present. The gateway does not
+require an expiration or limit the token age, so use a short expiration.
+
+**2. Pass the token to the widget:**
+
+```js
+const widget = window.BotfriendsWidgetApi.init("YOUR_WEBCHAT_ID", {
+  integration: {
+    metadataJWT,
+  },
+});
+```
+
+The token is sent with each outgoing message. The gateway verifies it and
+forwards only the verified `metadata` to the bot. The token itself is not added
+to the message, stored with the conversation, or forwarded to the bot.
+
+If the token is invalid, expired, signed with the wrong secret, or its
+`projectId` does not match the webchat's project, no verified metadata is
+forwarded. The message itself is still delivered.
+
+For tokens that change per message, return a fresh token from the `beforeSend`
+hook ([Step 7](#beforesend)).
+
+Signed metadata is not a login: it does not identify or authenticate the
+visitor, and its contents are still visible in the browser. The widget manages
+its own connection to the chat gateway; you do not need to provide a token for
+that.
+
+## Step 7: Intercept messages with hooks
+
+Hooks let you run your own code before a message is shown or sent. Register them
+under `integration.hooks`. Each hook has a `handler` function, which may return a
+value directly or a Promise, and an optional `timeoutMs`:
+
+```js
+const widget = window.BotfriendsWidgetApi.init("YOUR_WEBCHAT_ID", {
+  integration: {
+    hooks: {
+      beforeDisplay: {
+        handler: (message, { element }) => {
+          element.classList.add(`customer-message--${message.role}`);
+          return true;
+        },
+      },
+      beforeSend: {
+        handler: (message) => {
+          return {
+            message: {
+              ...message,
+              metadata: {
+                ...message.metadata,
+                custom: { source: "website" },
+              },
             },
-            {
-                type: 'text',
-                name: 'company-website',
-                label: 'Company website',
-                placeholder: 'mycompany.com'
-            },
-            {
-                type: 'select',
-                name: 'company-size',
-                label: 'Company size',
-                placeholder: 'Choose a number...',
-                options: [
-                    {
-                        name: '1-10',
-                        label: '1-10 employees'
-                    },
-                    {
-                        name: '11-50',
-                        label: '11-50 employees'
-                    },
-                    {
-                        name: '51+',
-                        label: '51+ employees'
-                    }
-                ]
-            }
-        ]
+            metadataJWT: getFreshMetadataJWT(), // your own function
+          };
+        },
+        timeoutMs: 3000,
+      },
     },
-    customText: {
-        actionPaymentCompleted: 'Payment Completed',
-        actionPaymentError: 'An error occurred while processing the card. <br> Please try again or use a different card.',
-        actionPostbackError: 'An error occurred while processing your action. Please try again.',
-        clickToRetry: 'Message not delivered. Click to retry.',
-        clickToRetryForm: 'Form not submitted. Click anywhere on the form to retry.',
-        connectNotificationText: 'Give us a way to reach out:',
-        connectNotificationSingleText: 'Be notified when you get a reply.',
-        connectNotificationSingleButtonText: 'Turn on <name> notifications',
-        connectNotificationOthersText: 'others',
-        conversationTimestampHeaderFormat: 'MMMM D YYYY, h:mm A',
-        couldNotConnect: 'Couldn\'t connect. You can {retry}. '
-        couldNotConnectInner: 'retry connecting now'
-        couldNotConnectWithRetry: 'Couldn\'t connect. We\'ll keep retrying, or you can {retry}.',
-        couldNotConnectWithRetryInner: 'try now',
-        emailChangeAddress: 'Change my email',
-        emailDescription: 'To be notified by email when you get a reply, enter your email address.',
-        emailFieldLabel: 'Your email',
-        emailFieldPlaceholder: 'Your email address',
-        emailFormButton: 'Continue',
-        fetchHistory: 'Load more',
-        fetchingHistory: 'Retrieving history...',
-        fileTooLargeError: 'Max file size limit exceeded ({size})',
-        fileTypeError: 'Unsupported file type.',
-        formErrorInvalidEmail: 'Email is invalid',
-        formErrorNoLongerThan: 'Must contain no more than ({characters}) characters',
-        formErrorNoShorterThan: 'Must contain at least ({characters}) characters',
-        formErrorUnknown: 'This doesn\'t look quite right',
-        formFieldSelectPlaceholderFallback: 'Choose one...',
-        frontendEmailChannelDescription: 'To talk to us using email just send a message to our email address and we\'ll reply shortly:',
-        headerText: 'How can we help?',
-        imageClickToReload: 'Click to reload image.',
-        imageClickToView: 'Click to view {size} image.',
-        imagePreviewNotAvailable: 'Preview not available.',
-        inputPlaceholder: 'Type a message...',
-        inputPlaceholderBlocked: 'Complete the form above...',
-        introAppText: 'Message us below or from your favorite app.',
-        introductionText: 'We\'re here to talk, so ask us anything!',
-        lineChannelDescription: 'To talk to us using LINE, scan this QR code using the LINE app and send us a message.',
-        linkError: 'An error occurred when attempting to generate a link for this channel. Please try again.',
-        locationNotSupported: 'Your browser does not support location services or it’s been disabled. Please type your location instead.',
-        locationSecurityRestriction: 'This website cannot access your location. Please type your location instead.',
-        locationSendingFailed: 'Could not send location',
-        locationServicesDenied: 'This website cannot access your location. Allow access in your settings or type your location instead.',
-        messageError: 'An error occured while sending your message. Please try again.',
-        messageIndicatorTitlePlural: '({count}) New messages',
-        messageIndicatorTitleSingular: '({count}) New message',
-        messageRelativeTimeDay: '{value}d ago',
-        messageRelativeTimeHour: '{value}h ago',
-        messageRelativeTimeJustNow: 'Just now',
-        messageRelativeTimeMinute: '{value}m ago',
-        messageTimestampFormat: 'h:mm A',
-        messageSending: 'Sending...',
-        messageDelivered: 'Delivered',
-        messengerChannelDescription: 'Connect your Facebook Messenger account to be notified when you get a reply and continue the conversation on Facebook Messenger.',
-        notificationSettingsChannelsDescription: 'You can also talk to us from your favorite app or service.',
-        notificationSettingsChannelsTitle: 'Other Channels',
-        notificationSettingsConnected: 'Connected',
-        notificationSettingsConnectedAs: 'Connected as {username}',
-        prechatCaptureGreetingText: 'Hi there 👋\nTo start off, we\'d like to know a little bit more about you:',
-        prechatCaptureNameLabel: 'Your name',
-        prechatCaptureNamePlaceholder: 'Type your name...',
-        prechatCaptureEmailLabel: 'Email',
-        prechatCaptureEmailPlaceholder: 'name@company.com',
-        prechatCaptureConfirmationText: 'Thanks for that! What can we help you with?',
-        prechatCaptureMailgunLinkingConfirmation: 'You\'ll be notified here and by email at {email} once we reply.',
-        sendButtonText: 'Send',
-        settingsHeaderText: 'Settings',
-        shareLocation: 'Share location',
-        smsBadRequestError: 'We were unable to communicate with this number. Try again or use a different one.',
-        smsCancel: 'Cancel',
-        smsChangeNumber: 'Change my number',
-        smsChannelDescription: 'Connect your SMS number to be notified when you get a reply and continue the conversation over SMS.',
-        smsChannelPendingDescription: 'Check your messages at {number} to confirm your phone number.',
-        smsContinue: 'Continue',
-        smsInvalidNumberError: 'Your phone number isn\'t valid. Please try again.',
-        smsLinkCancelled: 'Link to {appUserNumber} was cancelled.',
-        smsLinkPending: 'Pending',
-        smsPingChannelError: 'There was an error sending a message to your number.',
-        smsSendText: 'Send me a text',
-        smsStartTexting: 'Start Texting',
-        smsTooManyRequestsError: 'A connection for that number was requested recently. Please try again in {minutes} minutes.',
-        smsTooManyRequestsOneMinuteError: 'A connection for that number was requested recently. Please try again in 1 minute.',
-        smsUnhandledError: 'Something went wrong. Please try again.',
-        tapToRetry: 'Message not delivered. Tap to retry.',
-        tapToRetryForm: 'Form not submitted. Tap anywhere on the form to retry.',
-        telegramChannelDescription: 'Connect your Telegram account to be notified when you get a reply and continue the conversation on Telegram',
-        uploadDocument: 'Upload document',
-        uploadInvalidError: 'Invalid file',
-        uploadPhoto: 'Upload photo',
-        uploadVirusError: 'A virus was detected in your file and it has been rejected',
-        unsupportedMessageType: 'Unsupported message type.',
-        unsupportedActionType: 'Unsupported action type.',
-        viberChannelDescription: 'Connect your Viber account to be notified when you get a reply and continue the conversation on Viber. To get started, scan the QR code using the Viber app.',
-        viberChannelDescriptionMobile: 'Connect your Viber account to be notified when you get a reply and continue the conversation on Viber. To get started, install the Viber app and tap Connect.',
-        viberQRCodeError: 'An error occurred while fetching your Viber QR code. Please try again.',
-        wechatChannelDescription: 'Connect your WeChat account to be notified when you get a reply and continue the conversation on WeChat. To get started, scan this QR code using the WeChat app.',
-        wechatChannelDescriptionMobile: 'Connect your WeChat account to be notified when you get a reply and continue the conversation on WeChat. To get started, save this QR code image and upload it in the <a href=\'weixin://dl/scan\'>QR code scanner</a>.',
-        wechatQRCodeError: 'An error occurred while fetching your WeChat QR code. Please try again.',
-        whatsappChannelDescriptionDesktop: 'Sync your account to WhatsApp by scanning the QR code or clicking the link below.\nThen, send the pre-populated message to validate the sync request. (Your code: {{code}}).',
-        whatsappChannelDescriptionMobile: 'Sync your account to WhatsApp by clicking the link below.\nThen, send the pre-populated message to validate the sync request. (Your code: {{code}}).',
-        whatsappLinkingError: 'An error occurred while fetching your WhatsApp linking information. Please try again.'
-    }
-}).then(function() {
-    // Your code after init is complete
-});
-initPromise.then(function() {
-    // do something
-});
-// pass it around...
-initPromise.then(function() {
-    //do something else
+  },
 });
 ```
 
-#### open()
+The two supported hooks are `beforeDisplay` and `beforeSend`.
 
-Opens the conversation widget (noop when embedded)
+Events from Step 3 only notify you; hooks can change or stop a message.
 
-```javascript
-BotfriendsWebchat.open();
-```
+### `beforeDisplay`
 
-#### close()
+Runs for each user, agent, and system message before it becomes visible,
+including earlier messages of the conversation and carousel cards. It runs again
+each time the message is rendered, for example when the chat is closed and
+reopened, so apply styling every time it runs.
 
-Closes the conversation widget (noop when embedded)
+The handler receives the message and a context object. `context.element` is the
+rendered message element. Return `false` to hide the message; return `true` or
+nothing to show it.
 
-```javascript
-BotfriendsWebchat.close();
-```
-
-#### isOpened()
-
-Tells if the widget is currently opened or closed.
-
-```javascript
-BotfriendsWebchat.isOpened();
-```
-
-#### login(userId , jwt)
-
-Logs a user in the Web Messenger, retrieving the conversation the user already had on other browsers and/or devices. Note that you don't need to call this after `init` if you passed the user id and jwt already, it's done internally. This returns a promise that resolves when the Web Messenger is ready again.
-
-```javascript
-BotfriendsWebchat.login('some-id', 'some-jwt');
-```
-
-#### logout()
-
-Logs out the current user and reinitialize the widget with an anonymous user. This returns a promise that resolves when the Web Messenger is ready again.
-
-```javascript
-BotfriendsWebchat.logout();
-```
-
-#### destroy()
-
-Destroys the Web Messenger and makes it disappear. The Web Messenger has to be reinitialized with `init` to be working again because it also clears up the integration id from the Web Messenger. It will also unbind all listeners you might have with `BotfriendsWebchat.on`.
-
-```javascript
-BotfriendsWebchat.destroy();
-```
-
-#### sendMessage(message)
-
-Sends a message on the user's behalf
-
-```javascript
-BotfriendsWebchat.sendMessage({
-    type: 'text',
-    text: 'hello'
-});
-// OR
-BotfriendsWebchat.sendMessage('hello', '<conversation-id>');
-```
-
-#### startTyping()
-
-Sends an event indicating the appUser has started typing. When called, a `stopTyping` timer will be created and will call `stopTyping()` after 10s, unless `stopTyping()` has been called manually. Everytime `startTyping()` is called the timer is reset. If `startTyping()` is called repeatedly, an event will only be sent if the time since the last sent event is greater then 10s.
-
-If **conversationId** is not provided, the currently loaded conversation will be used.
-
-```javascript
-BotfriendsWebchat.startTyping();
-```
-
-#### stopTyping()
-
-Sends an event indicating the appUser has stoped typing.
-
-```javascript
-BotfriendsWebchat.stopTyping();
-```
-
-#### triggerPostback(actionId, conversationId)
-
-Trigger a `postback` action on the user's behalf.
-The `actionId` is the `_id` property of the targeted action.
-
-If you have the `_id` of the targetted `postback` action, you can pass it directly to `triggerPostback`.
-
-If **conversationId** is not provided, the currently loaded conversation will be used.
-
-```javascript
-const actionId = '5a747faa065bbe4e7804f2a4';
-BotfriendsWebchat.triggerPostback(actionId, '62565b5c2b4039adff80b7fd');
-```
-
-Otherwise, you can get the `_id` of an action by using `BotfriendsWebchat.getConversation()`, e.g.
-
-```javascript
-const conversation = BotfriendsWebchat.getConversation();
-console.log(conversation.messages);
-// [
-//     {
-//         "text": "Do you want to continue?",
-//         "actions": [
-//             {
-//                 "payload": "text:continue",
-//                 "text": "Continue conversation",
-//                 "_id": "5a7c65211aaa9b61f69c95e3",
-//                 "type": "postback"
-//             }
-//         ],
-//         "type": "text",
-//         "role": "appMaker",
-//         "_id": "5a7c65211aaa9b61f69c95e2",
-//         // ...
-//     }
-// ]
-// Indicate that the user has clicked on the "Continue conversation" postback action.
-BotfriendsWebchat.triggerPostback(conversation.messages[0].actions[0]._id);
-```
-
-#### updateUser(user)
-
-Updates user information
-
-```javascript
-BotfriendsWebchat.updateUser({
-    givenName: 'Updated',
-    surname: 'Name',
-    email: 'updated@email.com',
-    properties: {
-      'justGotUpdated': true
-    }
-});
-```
-
-#### getUser()
-
-Returns the current user.
-
-```javascript
-var user = BotfriendsWebchat.getUser()
-```
-
-#### getConversation()
-
-Returns the conversation if it exists
-
-```javascript
-var conversation = BotfriendsWebchat.getConversation();
-// Data object
-conversation = {
-    _id: '<conversation-id>',
-    unreadCount: 0,
-    lastUpdatedAt: 1581010017.596,
-    type: "personal",
-    participants: [
-        {
-            _id: '<participant-id>',
-            appUserId: '<appUser-id>',
-            unreadCount: 0,
-            lastRead: 1581010017.596
-        }
-    ],
-    metadata: {},
-    messages: [
-        {
-            role: 'appUser',
-            authorId: '6ac41c8b32e704f3cdb9052d',
-            name: 'Some user',
-            _id: '5e6022c9cb55158bfd53f845',
-            type: "text",
-            received: 1583358665.139,
-            text: 'Hello',
-            source: {
-                type: 'web',
-                id: 'c38ae913af7c4ef3800b339ee529c579',
-                integrationId: '5d8274d4aa780a5483f0ee56'
-            }
-        }
-    ]
-}
-```
-
-#### loadConversation(conversationId)
-
-Loads a conversation into the current session
-
-```javascript
-BotfriendsWebchat.loadConversation('<conversation-id>');
-```
-
-#### startConversation()
-
-Creates a user and conversation on the server, allowing the business to reach out proactively to the user via the public API.
-
-It is strongly recommended to only call this method in the case where a message is likely to be sent.
-
-This method is called automatically when starting a conversation via the `sendMessage` method, or when a user sends a message via the conversation view.
-
-If a conversation already exists for the current user, this call is a no-op.
-
-```javascript
-BotfriendsWebchat.startConversation();
-```
-
-#### markAllAsRead()
-
-Marks all unread messages as read.
-
-```javascript
-BotfriendsWebchat.markAllAsRead();
-```
-
-#### showNotificationChannelPrompt()
-
-Displays a prompt to the user suggesting the linking of the current chat instance with other 3rd-party apps.
-
-```javascript
-BotfriendsWebchat.showNotificationChannelPrompt();
-```
-
-#### setPredefinedMessage(message)
-
-Prefills the user's chat input with a predefined message.
-
-```javascript
-BotfriendsWebchat.setPredefinedMessage(message);
-```
-
-#### setDelegate(delegate)
-
-Sets a delegate on the conversation. BotfriendsWebchat must be initialized before calling this method. See the [delegate](#delegate) section for more details.
-
-```javascript
-BotfriendsWebchat.setDelegate(delegate);
-```
-
-### Delegate
-
-BotfriendsWebchat allows you to set a delegate to receive callbacks when important changes happen in the conversation.
-To set a delegate, pass the `delegate` parameter in to [init options](#options), or use the [setDelegate](#setdelegatedelegate) method. The `delegate` object may optionally contain `beforeDisplay`, `beforeSend`, `beforePostbackSend` and `onInvalidAuth` delegate functions.
-
-A `data` object is passed down with all the delegate events except `onInvalidAuth`. This is a read-only object containing a truncated version of the conversation associated with the event.
-
-```javascript
-const delegate = {
-    beforeDisplay(message, data) {
-        if (data.conversation._id === '<my-conversation-id>') {
-            message.name = 'Acme Blank';
-        }
-        return message;
-    },
-    beforeSend(message, data) {
-        return message;
-    },
-    beforePostbackSend(postback, data) {
-        return postback;
-    },
-    onInvalidAuth() {
-        return new Promise((resolve) =>
-            resolve('<my-new-auth-token>')
-        )
-    }
-}
-// Passing delegate as an init parameter
-BotfriendsWebchat.init({
-    integrationId: '<integration-id>',
-    delegate
-});
-// Using setDelegate
-BotfriendsWebchat.init({ integrationId: '<integration-id>' }).then(() => {
-    BotfriendsWebchat.setDelegate(delegate);
-});
-```
-
-#### beforeDisplay
-
-The `beforeDisplay` delegate allows a message to be hidden or modified before it is displayed in the conversation. This delegate should return a falsy value such as `null` to hide the message. It can also return a modified message object in order to change what the user will see rendered in their conversation history. Note that this change affects the client side rendering only; the server side copy of this message can not be modified by this delegate.
-
-```javascript
-BotfriendsWebchat.init({
-    integrationId: '<integration-id>',
-    delegate: {
-        beforeDisplay(message, data) {
-            if (data.conversation._id === '<conversation-id>' && message.metadata && message.metadata.isHidden) {
-                return null;
-            }
-            return message;
-        }
-    }
-});
-```
-
-#### beforeSend
-
-The `beforeSend` delegate method allows you to modify properties of a message before sending it to BotfriendsWebchat.
-The modified message must be returned for it to take effect.
-
-Note that when a file or an image is uploaded, only the message `metadata` may be updated. Other message properties such as `type` or `text` won't be considered.
-
-```javascript
-BotfriendsWebchat.init({
-    integrationId: '<integration-id>'
-    delegate: {
-        beforeSend(message, data) {
-            if (data.conversation._id === '<conversation-id>') {
-                message.metadata = {
-                    any: 'info'
-                };
-            }
-            return message;
-        }
-    }
-});
-```
-
-If no language detection is enabled in BOTfriends X, the `beforeSend` delegate method can also be used to pass a language code to be used for intent detection. 
-The language codes (e.g. en, de, fr, es) you can use can be found in your NLU integration in BOTfriends X. Make sure to use only language codes that exist in your BOTfriends X project.
-
-```javascript
-BotfriendsWebchat.init({
-    integrationId: '<integration-id>'
-    delegate: {
-        beforeSend(message, data) {
-            message.metadata = {
-                languageCode: 'de'
-            }
-            return message;
-        }
-    }
-});
-```
-
-#### beforePostbackSend
-
-The `beforePostbackSend` delegate method allows you to modify properties of a postback before sending it to BotfriendsWebchat.
-The modified postback must be returned for it to take effect.
-
-```javascript
-BotfriendsWebchat.init({
-   integrationId: '<integration-id>',
-   delegate: {
-       beforePostbackSend(postback) {
-           if (data.conversation._id === '<conversation-id>') {
-               postback.metadata = {
-                   any: 'info'
-               };
-           }
-           return postback;
-       }
-   }
-});
-```
-
-#### onInvalidAuth
-
-The `onInvalidAuth` delegate notifies the delegate of a failed request due to invalid credentials and allows the implementer to set a new auth token in order to retry the request. The delegate must return a new JWT token as a `string` or `Promise<string>` that will resolve into the JWT.
-
-```javascript
-BotfriendsWebchat.init({
-    integrationId: '<integration-id>',
-    delegate: {
-        onInvalidAuth() {
-            return '<my-new-auth-token>';
-        }
-    }
-});
-```
-
-### Events
-
-If you want to make sure your events are triggered, try to bind them before calling `BotfriendsWebchat.init`.
-
-To bind an event, use `BotfriendsWebchat.on(<event name>, <handler>);`. To unbind events, you can either call `BotfriendsWebchat.off(<event name>, handler)` to remove one specific handler, call `BotfriendsWebchat.off(<event name>)` to remove all handlers for an event, or call `BotfriendsWebchat.off()` to unbind all handlers.
-
-#### ready
-
-```javascript
-// This event triggers when init completes successfully... Be sure to bind before calling init!
-BotfriendsWebchat.on('ready', function(){
-    console.log('the init has completed!');
-});
-BotfriendsWebchat.init(...).then(function() {
-    // Your code after init is complete
-});
-```
-
-#### destroy
-
-```javascript
-// This event triggers when the widget is destroyed.
-BotfriendsWebchat.on('destroy', function(){
-    console.log('the widget is destroyed!');
-});
-BotfriendsWebchat.destroy();
-```
-
-#### participant:added
-
-```javascript
-// This event triggers when a participant is added to a conversation
-BotfriendsWebchat.on('participant:added', function(participant, data) {
-    console.log(`A participant was added to conversation ${data.conversation._id}: `, participant);
-});
-```
-
-#### participant:removed
-
-```javascript
-// This event triggers when a participant is removed from a conversation
-BotfriendsWebchat.on('participant:removed', function(participant, data) {
-    console.log(`A participant was removed from conversation ${data.conversation._id}: `, participant);
-});
-```
-
-#### conversation:added
-
-```javascript
-// This event triggers when a conversation is added
-BotfriendsWebchat.on('conversation:added', function(participants, data) {
-    console.log(`Conversation ${data.conversation._id} was added with following participants: `, participants);
-});
-```
-
-#### conversation:read
-
-```javascript
-// This event triggers when a participant in a sdkGroup chat reads a message
-BotfriendsWebchat.on('conversation:read', function(payload, data) {
-    if (data.role === 'appMaker') {
-        console.log(`Conversation ${data.conversation._id} was read by appMaker`);
-    } else if (data.role === 'appUser') {
-        console.log(`Conversation ${data.conversation._id} was read by appUserId: ${payload.appUserId}`);
-    }
-});
-// Data object, if the conversation was read by the appMaker, the appUser property will not exist
-payload = {
-    appUserId: '<appUser-id>',
-    lastRead: 1581010017.596,
-    role: 'appUser'
-}
-data = {
-    conversation: {
-        _id: '<conversation-id>'
-    }
-}
-```
-
-#### conversation:removed
-
-```javascript
-// This event triggers when a conversation is removed
-BotfriendsWebchat.on('conversation:removed', function(data) {
-    console.log(`Conversation ${data.conversation._id} was removed`);
-});
-// data object
-data = {
-    conversation: {
-        _id: '<conversation-id>'
-    }
-}
-```
-
-#### message:received
-
-```javascript
-// This event triggers when the user receives a message
-BotfriendsWebchat.on('message:received', function(message, data) {
-    console.log(`The user received a message in conversation ${data.conversation._id}: `, message);
-});
-// data object
-data = {
-    conversation: {
-        _id: '<conversation-id>'
-    }
-}
-```
-
-#### message:sent
-
-```javascript
-// This event triggers when the user sends a message
-BotfriendsWebchat.on('message:sent', function(message, data) {
-    console.log(`The user sent a message in conversation ${data.conversation._id}: `, message);
-});
-// data object
-data = {
-    conversation: {
-        _id: '<conversation-id>'
-    }
-}
-```
-
-#### message
-
-```javascript
-// This event triggers when a message was added to the conversation
-BotfriendsWebchat.on('message', function(message, data) {
-    console.log(`A message was added in the conversation ${data.conversation._id}: `, message);
-});
-// data object
-data = {
-    conversation: {
-        _id: '<conversation-id>'
-    }
-}
-```
-
-#### unreadCount
-
-```javascript
-// This event triggers when the number of unread messages changes
-BotfriendsWebchat.on('unreadCount', function(unreadCount, data) {
-    console.log(`the number of unread messages was updated for conversation ${data.conversation._id}:`, unreadCount);
-});
-// data object
-data = {
-    conversation: {
-        _id: '<conversation-id>'
-    }
-}
-```
-
-#### widget:opened
-
-```javascript
-// This event triggers when the widget is opened (noop when embedded)
-BotfriendsWebchat.on('widget:opened', function() {
-    console.log('Widget is opened!');
-});
-```
-
-#### widget:closed
-
-```javascript
-// This event triggers when the widget is closed (noop when embedded)
-BotfriendsWebchat.on('widget:closed', function() {
-    console.log('Widget is closed!');
-});
-```
-
-#### connected
-
-```javascript
-// This event triggers when an active connection has been established for the first time,
-// or when the connection has been re-established after a `disconnect` event.
-BotfriendsWebchat.on('connected', function(e) {
-    console.log('Connected');
-});
-```
-
-#### disconnected
-
-```javascript
-// This event triggers when an active connection is lost
-// While disconnected, the client will not be able to recieve messages
-BotfriendsWebchat.on('disconnected', function(e) {
-    console.log('Disonnected');
-});
-```
-
-#### typing:start
-
-```javascript
-// This event triggers when appMaker starts typing. The associated conversation is passed in the argument.
-BotfriendsWebchat.on('typing:start', function(data) {
-    console.log(`${data.name} started typing!`, data.conversation._id);
-});
-// If the name and avatarUrl for the typing user is known it will be available as properties in the data object
-// Data object
-data = {
-    conversation: {
-        _id: '<conversation-id>',
-    },
-    avatarUrl: 'http://path.com/to/avatar-url-of-user',
-    name: 'Name of Typing User',
-}
-```
-
-#### typing:stop
-
-```javascript
-// This event triggers when appMaker stops typing. The associated conversation is passed in the argument.
-BotfriendsWebchat.on('typing:stop', function(data) {
-    console.log(`${data.name} stopped typing!`, data.conversation._id);
-});
-// data object
-data = {
-    conversation: {
-        _id: '<conversation-id>'
-    }
-}
-```
-
-### Embedded mode
-
-As describe above, to activate the embedded mode, you need to pass `embedded: true` when calling `BotfriendsWebchat.init`. By doing so, you are disabling the auto-rendering mechanism and you will need to call `BotfriendsWebchat.render` manually. This method accepts a DOM element which will be used as the container where the widget will be rendered.
-
-```javascript
-BotfriendsWebchat.init({
-    integrationId: '<integration-id>',
-    embedded: true
-});
-BotfriendsWebchat.render(document.getElementById('chat-container'));
-```
-
-The embedded widget will take full width and height of the container. You must give it a height, otherwise, the widget will collapse.
-
-### Authenticating the user: init() vs login()
-
-For authenticated user scenarios, a user's credentials can be passed in to either `init()` or `login()`. The question remains: when should you use which?
-
-When `init()` is called without a `userId` and `jwt`, the UI will be initialized in an anonymous user context, and the user will be able to send messages as an anonymous user. After `init()` has completed, `login()` may be called to authenticate the user and resume any existing conversation. This is useful if you want your users to be able to send messages before they've logged in to your website. Once a user does login and the browser is issued a valid `jwt`, `login()` may be called so that the user may continue the conversation in an authenticated session.
-
-If however your use case requires that all users be logged in before they may send messages, then you should consider passing `userId` and `jwt` directly to the `init()` call upfront.
-
-### Automatic Welcome Message
-
-Some use-cases require to send a message to the user directly upon opening the web chat widget. This behavior can be implemented by listening to the `'widget:opened'` event, and then calling the `startConversation()` method, if the user is new to the chat:
-
-```javascript
-BotfriendsWebchat.on('widget:opened', function() {
-  var conversation = BotfriendsWebchat.getConversation()
-  var isNewUser = !conversation?.messages?.length
-  if (isNewUser) {
-    BotfriendsWebchat.startConversation()
-  }
-})
-```
-#### v1 Projects
-The connected bot needs to have a ‘WELCOME’ event added in the intent to be sent automatically. More information can be found in the [BOTfriends X docs](https://docs.botfriendsx.com/#/IM/Events?id=send-a-start-message-in-the-website-chat-welcome).
-
-#### v2 Projects
-`BotfriendsWebchat.startConversation()` will automatically trigger the **Welcome Node** in the **Welcome Dialog**. More information can be found in the [BOTfriends X Knowledge Hub](https://knowledgehub.botfriendsx.com/#/BotBuilder/WorkWithDialogs?id=welcome-node).
-
-### Enable Markdown in Webchat
-
-1. To enable display of Markdown Language in bot responses add the [markedjs](https://github.com/markedjs/marked) script to the html file:
-```html
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-```
-2. Add markdown parsing to the `delegate.beforeDisplay` method:
+The widget renders inside a Shadow DOM, so `document.querySelector(...)` cannot
+find its elements. Use `context.element`, or query the widget's `shadowRoot`:
 
 ```js
-BotfriendsWebchat.init({
-  // ...
-  delegate: {
-    beforeDisplay(message, data) {
-      // ...
-      if (!message.text || message.role == 'appUser') {
-        return message
-      }
-      message.text = message.text.replaceAll('\n', '<br>')
-      const parsed = marked.parse(message.text)
-      const webMessenger = document.getElementById('web-messenger-container')
-      const messageContainer = webMessenger.contentWindow.document.getElementsByClassName('messages-container')[0]
-      const messageId = message?._id ?? ''
-      const [element] = messageContainer.querySelectorAll(`[data-for=tooltip-${messageId}]`)
-      if (element) {
-        const textSpan = element.getElementsByClassName('message-item')[0]
-        const isKnowledgeBaseSource = message?.metadata?.isKnowledgeBaseSource
-        textSpan.innerHTML = isKnowledgeBaseSource ? `<i>${parsed}</i>` : parsed
-        for (const child of textSpan.children) {
-          child.style = `padding: 0px!important; margin: 0px!important`
-          const hrefs = child.querySelectorAll('a')
-          for (const href of hrefs) {
-            href.setAttribute('target', '_blank')
-          }
-        }
-        const lists = textSpan.querySelectorAll('ul, ol')
-        for (const list of lists) {
-          list.style = 'padding-left: 16px;'
-        }
-      }
-      return message
-    }
-  }
-})
+const root = document.querySelector(
+  '[data-botfriends-widget="root"]',
+)?.shadowRoot;
+const element = root?.querySelector(
+  `[data-message-id="${CSS.escape(message.id)}"]`,
+);
 ```
 
-3. Add Markdown to your bot responses. Use the [Cheat Sheet](https://www.markdownguide.org/cheat-sheet/) to find the tags that match your needs
+### `beforeSend`
 
-### System Message Metadata (V2)
+Runs once for each outgoing message before it is sent. Return nothing to send
+the message unchanged, or an object with these optional fields:
 
-Every message sent by bot includes the following properties:
+- `message`: the changed message. Only `payload`, `metadata`, `displayText`, and
+  `languageCode` are used; omitted fields keep their original values. The
+  message stays a user message and keeps its `id`. User payloads must be valid
+  text, event, or file payloads.
+- `metadataJWT`: a signed metadata token for this message only. A string replaces
+  the configured `integration.metadataJWT`, `null` sends no token, and leaving it
+  out keeps the configured token. Put it next to `message`, not inside it.
+- `send`: set to `false` to cancel sending. The message is removed from the
+  conversation and its text is put back into the input field.
 
-- **nodeName**: Name of the bot node in which the response is maintained.
+Invalid or oversized metadata, or an invalid payload, is ignored with a warning
+and the original message is sent. If sending has to be retried, the widget
+reuses the result and does not run the hook again.
 
-The last bot message in a user-bot interaction contains additional details about the current state of the conversation:
-- **isAgentMessage**: Indicates whether the message was sent by a human agent.
-- **transactionId**: A unique ID for the user-bot interaction.
-- **sessionId**: The unique conversation ID of the user.
-- **currentNodeName**: The current node where the user is located.
-- **currentWorkflowName**: The current dialogue in which the user is engaged.
+### Timeouts and errors
 
-You can access the metadata of a message through the `message.metadata` object within various message-related delegates or event listeners.
+The default timeout is three seconds; the maximum is 30 seconds. If a handler
+throws, rejects, or times out, the widget continues as if there were no hook:
+`beforeDisplay` shows the message and `beforeSend` sends the original message. A
+timeout cannot interrupt a handler that runs synchronously.
 
-### Example: Disable Input-Field based on specific Bot Node Message (V2)
+### Changing hooks later
 
-1. Write a function that allows access to the input field of the Botfriends webchat. 
+`updateConfig(...)` replaces individual hooks. Set a hook to `null` to remove it;
+hooks not mentioned in the update stay registered. Unknown hook names and hooks
+without a `handler` function are ignored with a console warning. A changed
+`beforeDisplay` hook affects only messages rendered afterwards.
+
+## Demo mode
+
+Set `system.disableInteraction: true` when starting the widget to show a preview
+without a real conversation, connection, or authentication. This setting cannot
+be changed with `updateConfig(...)`; destroy the widget and start it again.
+
+In demo mode, `addMessages(messages)` and `clearMessages()` manage the preview
+content. Messages need a `role` and a matching `payload`; `id` and `createdAt`
+are generated when omitted. Preview content is never sent to the gateway.
+
+## Reference
+
+### Configuration options
+
+These settings can be used in `window.BotfriendsWidgetOptions`, in the `options`
+argument of `init(...)`, and in `updateConfig(...)`. All of them are optional.
+Nested settings are merged individually, so changing one field keeps its sibling
+fields.
+
+| Field                                                                            | Supported values                                                                  |
+| -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `name`, `description`                                                            | Configuration name and description strings.                                       |
+| `lastUpdated`                                                                    | Configuration update timestamp as a non-negative integer.                         |
+| `appearance.useAvatar`, `appearance.avatarUrl`                                   | Whether to show an avatar and its image URL.                                      |
+| `appearance.useInfoBanner`                                                       | Whether to show the information banner.                                           |
+| `appearance.brandColor`                                                          | Main brand color as a 3- or 6-digit hex color, for example `#2457a6`.             |
+| `appearance.agentMessageColor`, `appearance.userMessageColor`                    | Agent and user message colors as 3- or 6-digit hex colors.                        |
+| `launcher.useIcon`, `launcher.iconUrl`                                           | Whether to use a custom launcher icon and its URL.                                |
+| `launcher.size`                                                                  | `small`, `medium`, `large`, or a number (custom size in pixels).                  |
+| `launcher.color`                                                                 | Launcher color.                                                                   |
+| `conversation.fileUpload`                                                        | Enable or disable file upload.                                                    |
+| `conversation.languageSelection`                                                 | Enable or disable conversation language selection.                                |
+| `conversation.restartConversation`                                               | Enable or disable restarting a conversation.                                      |
+| `conversation.downloadConversation`                                              | Enable or disable conversation download.                                          |
+| `system.position`                                                                | Floating widget position: `bottom-right` or `bottom-left`.                        |
+| `system.autoMount`, `system.autoOpen`                                            | Whether the widget appears and opens automatically after configuration loads.     |
+| `system.autoWelcome`                                                             | Whether the widget sends its configured welcome event when a conversation starts. |
+| `system.isActive`                                                                | Whether the widget is available to visitors.                                      |
+| `system.disableInteraction`                                                      | Show a non-interactive preview ([Demo mode](#demo-mode)).                         |
+| `system.forcePrivacyConsent`                                                     | Require the privacy-consent screen.                                               |
+| `privacy.showPrivacyPolicy`                                                      | Show the project's privacy-consent flow when configured.                          |
+| `showPoweredByBotfriends`                                                        | Show or hide the Botfriends attribution.                                          |
+| `localization.defaultLanguage`                                                   | Default widget and conversation language.                                         |
+| `localization.projectLanguages`                                                  | Languages enabled for the project.                                                |
+| `localization.widgetLanguages`                                                   | Languages available in the widget.                                                |
+| `localization.currentWidgetLanguage`, `localization.currentConversationLanguage` | Runtime language selections.                                                      |
+| `localization.translations`                                                      | Per-language text overrides (see below).                                          |
+| `integration.metadata`, `integration.metadataJWT`                                | User data for the bot ([Step 6](#step-6-pass-user-data-to-the-bot)).              |
+| `integration.hooks`                                                              | Message hooks ([Step 7](#step-7-intercept-messages-with-hooks)).                  |
+
+A more complete example:
 
 ```js
-function getInputField () {
-  const webMessenger = document.getElementById('web-messenger-container')
-  const footer = webMessenger.contentWindow.document.getElementById('footer')
-  const inputField = footer.getElementsByClassName('message-input')[0]
-  return inputField
-}
+window.BotfriendsWidgetOptions = {
+  appearance: {
+    useAvatar: true,
+    avatarUrl: "https://cdn.example.com/support-avatar.png",
+    useInfoBanner: true,
+    brandColor: "#2457a6",
+    agentMessageColor: "#f1f4f8",
+    userMessageColor: "#2457a6",
+  },
+  launcher: {
+    useIcon: false,
+    size: "medium",
+    color: "#2457a6",
+  },
+  system: {
+    position: "bottom-right",
+    autoMount: true,
+    autoOpen: false,
+  },
+  localization: {
+    defaultLanguage: "en",
+    projectLanguages: ["en", "de"],
+    widgetLanguages: ["en", "de"],
+    translations: {
+      en: {
+        "header.title": "How can we help?",
+        "header.subtitle": "Chat with our team",
+      },
+      de: {
+        "header.title": "Wie können wir helfen?",
+        "header.subtitle": "Schreiben Sie unserem Team",
+      },
+    },
+  },
+};
 ```
 
-2. In the `message:received` handler, add the logic for which bot node messages the input field should be disabled. 
+**Texts.** Every text in the widget can be overridden through
+`localization.translations`. To see all available text keys and their default
+values, call `window.BotfriendsWidgetApi.getDefaultTranslations()` in the browser
+console of a page that loads the widget.
 
-```js
-BotfriendsWebchat.on('message:received', function(message, data) {
-  const inputField = getInputField()
-  if (message.metadata?.nodeName === 'BOTNODE_NAME') {
-    inputField.disabled = true
-  } else {
-    inputField.disabled = false
-  }
-});
-```
+**Styling.** Only the settings above are supported. There is no custom CSS API,
+and because the widget renders in a Shadow DOM, your page's CSS cannot style the
+widget's internals.
 
-3. Add the following code to the end of the `BotfriendsWebchat.init()` function so that the logic for existing messages also works when the website chat is re-initialised. 
+### JavaScript API
 
-```js
-const inputField = getInputField()
-if (conversation?.messages.reverse()[0]?.metadata?.nodeName === 'BOTNODE_NAME') {
-  inputField.disabled = true
-}
-```
+#### `window.BotfriendsWidgetApi`
 
-## Content Security Policy
+Available as soon as the widget script has loaded.
 
-If your deployment requires [CSP compatibility](https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP), add the following meta tag to your configuration.
+| Member                                     | Description                                                                            |
+| ------------------------------------------ | -------------------------------------------------------------------------------------- |
+| `init(webchatId, options?, mountOptions?)` | Starts the widget and returns it. Replaces a widget that is already running.           |
+| `destroy()`                                | Removes the running widget from the page.                                              |
+| `version`                                  | The version of the loaded widget script.                                               |
+| `getDefaultTranslations()`                 | Returns the widget's built-in texts for all languages, keyed by language and text key. |
 
-```html
-<meta
-    http-equiv="Content-Security-Policy"
-    content="
-    connect-src
-        wss://*.{{YOUR_DOMAIN_NAME}}
-        https://*.{{YOUR_DOMAIN_NAME}};
-    font-src
-        https://*.{{YOUR_DOMAIN_NAME}};
-    script-src
-        https://*.{{YOUR_DOMAIN_NAME}};
-    style-src
-        https://*.{{YOUR_DOMAIN_NAME}};
-    img-src
-        blob:
-        https://*.gravatar.com
-        https://*.{{YOUR_DOMAIN_NAME}};"
-/>
-```
+`mountOptions` fields:
 
-Note that an equivalent configuration can be done [server side](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy).
+| Field          | Description                                                                                |
+| -------------- | ------------------------------------------------------------------------------------------ |
+| `container`    | An `HTMLElement` to show the chat in ([Step 5](#step-5-embed-the-chat-in-a-page-element)). |
+| `showLauncher` | Show the launcher button in embedded mode. Default: `false`.                               |
+| `openMenu`     | Show the menu initially. Intended for [demo mode](#demo-mode).                             |
 
-According to the channels you use, other domains may need to be added (these are used to display QR codes to link the Web Messenger conversation):
+#### `window.BotfriendsWidget`
 
--   LINE: https://qr-official.line.me
--   WeChat: https://mp.weixin.qq.com
--   WhatsApp: https://wa.me
+The running widget. It is set each time the widget starts and is also the
+return value of `init(...)`.
 
-Note that your CSP configuration should also include any domains used to host images or files sent in messages.
-If you require `blob:` to be excluded for `img-src`, you must disable the image upload feature via the [init settings](#initoptions).
+| Method                            | Description                                                                      |
+| --------------------------------- | -------------------------------------------------------------------------------- |
+| `open({ focus? }?)`               | Opens the chat panel. Set `focus: true` to move focus into the panel.            |
+| `close()`                         | Closes the chat panel.                                                           |
+| `toggle({ focus? }?)`             | Opens or closes the chat panel.                                                  |
+| `show()`                          | Makes the widget visible.                                                        |
+| `hide()`                          | Hides the widget, including the launcher.                                        |
+| `sendMessage(text)`               | Sends a text message as the visitor.                                             |
+| `updateConfig(options)`           | Changes settings of the running widget ([options](#configuration-options)).      |
+| `setWidgetLanguage(languageCode)` | Changes the language of the widget's texts.                                      |
+| `getWidgetLanguage()`             | Returns the current language of the widget's texts.                              |
+| `setConversationLanguage(code)`   | Changes the language of the conversation.                                        |
+| `getConversationLanguage()`       | Returns the current conversation language.                                       |
+| `on(eventName, listener)`         | Subscribes to an [event](#events). Returns a function that removes the listener. |
+| `destroy()`                       | Removes this widget from the page.                                               |
+| `addMessages(messages)`           | Adds preview messages. [Demo mode](#demo-mode) only.                             |
+| `clearMessages()`                 | Removes all preview messages. [Demo mode](#demo-mode) only.                      |
 
-## Webchat WCAG / BFSG Compliance
+`BotfriendsWidgetApi.destroy()` and `BotfriendsWidget.destroy()` both remove the
+running widget. The difference only matters if you keep a reference to an old
+widget: its `destroy()` does nothing once that widget has already been removed
+or replaced by a new `init(...)` call.
 
-As the Smooch Web Messenger does not ensure accessibility to all contents of the chat, BOTfriends provides an additional script that can be added to the web page to **enhance the accessibility of the Smooch Web Messenger**.
-The chat widget and its content are made accessible to **keyboard-only navigation** and **screenreaders**.
+After the widget is removed, `window.BotfriendsWidget` still points to the
+removed widget and its methods have no effect. Start a new widget with
+`init(...)` before using it again.
 
-#### Steps to integrate the script:
-1. Add the script to the page html:
-```html
-<script src='https://www.cdn.botfriendsx.com/bfsg/bfsg.min.js'></script>
-```
-2. Initialize the WCAG/BFSG modifications:
-```html
-BotfriendsWebchatBFSG.init(BotfriendsWebchat)
-```
+#### Events
 
-### Example:
-```html
-  <script src='https://www.cdn.botfriendsx.com/bfsg/bfsg.min.js'></script>
-  <!-- Web messenger script: -->
-  <script>
-    !function (s, r, o) {
-      ...
-    }(window, document, "BotfriendsWebchat");
-    BotfriendsWebchat.init({
-      ...
-    }).then(function () {
-      ...
-      // WCAG/BFSG script init:
-      BotfriendsWebchatBFSG.init(BotfriendsWebchat)
-    })
-    ...
-  </script>
-```
+Subscribe with `window.BotfriendsWidget.on(eventName, listener)`. The listener
+receives an event whose `detail` contains the data:
 
-### Accessibility Text Customization
-The script automatically applies the aria-live attribute to selected interface elements to improve screen reader support.
-Developers can override the default text values of these attributes by supplying a configuration object to the init() method.
+| Event                         | `event.detail`                                      |
+| ----------------------------- | --------------------------------------------------- |
+| `connection:error`            | `null`                                              |
+| `message:sent`                | The submitted chat message.                         |
+| `message:received`            | The received chat message.                          |
+| `message:typing`              | Typing state information.                           |
+| `conversation:new`            | `null` when a new conversation starts.              |
+| `conversation:terminated`     | The message that could not be delivered, or `null`. |
+| `conversation:changeLanguage` | An object containing `languageCode`.                |
 
-To customize the text, include a customText property in the initialization parameters.
-This property should contain key–value pairs, where each key corresponds to an element identifier and each value defines the associated announcement text.
+## Privacy, consent, and data storage
 
-**Available Customization Keys**
-| Option            | Default value         |
-| ----------------- | --------------------- |
-| bfsgChatHistory   | Chat history          |
-| bfsgChatWindow    | Chat Window           |
-| bfsgCloseChat     | Close Chat            |
-| bfsgIntroPanel    | Intro Panel           |
-| bfsgOpenWebchat   | Open webchat          |
-| bfsgResetchat     | Reset Chat            |
-| bfsgSays          | says                  |
-| bfsgSkipToInput   | Skip to message input |
-| bfsgUser          | User                  |
-| bfsgWebchat       | Webchat               |
-| bfsgWebchatClosed | Webchat closed        |
-| bfsgWebchatOpened | Webchat opened        |
+### Privacy information and consent prompt
 
-### Example:
-```html
-      BotfriendsWebchatBFSG.init(BotfriendsWebchat, customText: {bfsgChatHistory: 'History'})
-```
+The project configuration controls the widget's privacy screen:
 
+- `privacy.showPrivacyPolicy: true` shows the configured privacy information
+  before a visitor starts chatting, unless a recent acceptance is stored in
+  this browser for this webchat.
+- The displayed content and button labels are configured through the
+  localization keys `privacy.title`, `privacy.information`, `privacy.accept`,
+  and `privacy.decline`.
+- When a visitor accepts, the widget allows the chat to open and stores the
+  acceptance locally. When a visitor declines, the widget closes the chat and
+  does not store a decline record; the prompt is shown again the next time it
+  is opened.
+- With `privacy.showPrivacyPolicy: false`, the privacy prompt is not shown.
+  This does not clear an acceptance previously stored in the browser.
 
-## Acknowledgements
+The acceptance record is stored in the embedding site's browser `localStorage`
+under `bfx_widget_privacy_consent:<webchatId>`. It contains the choice
+(`accepted`) and the acceptance timestamp. It is scoped to the webchat and is
+considered valid for 48 hours; expired or invalid records are removed. If
+`localStorage` is unavailable or blocked, the widget can use the acceptance for
+the current page session but cannot remember it after reload.
 
-https://github.com/lipis/flag-icon-css
+`system.forcePrivacyConsent` is a separate forced-gate setting. When enabled,
+the privacy screen remains required and the widget does not start a gateway
+connection, even if an acceptance is stored. The accept and decline actions do
+not change the state while this setting is enabled. Use
+`privacy.showPrivacyPolicy` for the regular accept/decline flow.
+
+This widget behavior displays configured privacy information and remembers a
+local acceptance state. It does not create a server-side consent record, provide
+an audit trail, or determine whether the configured text or consent flow meets
+your legal requirements. Configure the privacy information and obtain any
+required legal review for your use case.
+
+### Browser storage
+
+The widget uses the embedding page's `localStorage` for:
+
+| Key                                            | Stored value and purpose                                             | Lifetime                                                                                                                               |
+| ---------------------------------------------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `bfx_resume_token`                             | The gateway-issued JWT used to resume the browser's webchat session. | Persists until replaced or removed by browser/site storage management. The token's validity is controlled by its server-issued expiry. |
+| `bfx_widget_privacy_consent:<webchatId>`       | The visitor's accepted privacy-screen state and timestamp.           | 48 hours from acceptance.                                                                                                              |
+| `bfx_widget_info_banner_dismissed:<webchatId>` | The timestamp when the visitor dismissed the information banner.     | 48 hours from dismissal.                                                                                                               |
+
+The session token is available to JavaScript running on the embedding page's
+origin; it is not stored in `sessionStorage` or an `httpOnly` cookie. Protect
+the host page against script injection and do not treat browser storage as a
+secure secret store. Destroying the widget removes its mounted UI but does not
+clear these `localStorage` entries. Unlike the consent and banner keys, the
+`bfx_resume_token` key has no webchat ID suffix, so there is one resume-token
+slot per embedding origin.
+
+### Conversation and message retention
+
+Conversation messages are retained by the gateway while the conversation is
+active. When a conversation is terminated, the gateway applies the retention
+period configured for the webchat/project. The default retention period is 30
+days. Conversations can be terminated by the configured inactivity timeout
+(default eight hours) or by an authoritative conversation-end event. The
+inactivity timeout and message retention period are separate settings.
+
+After the retention deadline, stored messages become eligible for deletion;
+physical deletion is asynchronous and may occur later. The local browser
+consent setting does not control server-side message retention. Contact your
+Botfriends X administrator to confirm the retention settings for your project
+and follow your organization's process for deletion requests.
+
+## Content security policy and bot-provided URLs
+
+The widget runs in the embedding page's document and renders inside a Shadow DOM.
+The Shadow DOM isolates styles, but it is not an iframe, origin boundary, or
+security sandbox. The embedding page's Content Security Policy (CSP) therefore
+continues to apply to the widget and its resources. Security headers returned by
+the chat gateway do not set or verify the CSP configured on your website.
+
+If your website uses a CSP, it must allow the widget and its connections to load.
+Usually, this means allowing the script host shown in your Botfriends X embed
+snippet, the chat gateway used by your project, and the hosts of images shown in
+chat messages. Botfriends X provides the relevant hosts for your deployment; you
+do not need to choose them yourself. If something is blocked, your browser's
+console will show a CSP error. If your website does not use a CSP, no CSP changes
+are needed.
+
+Bot-provided image messages and card artwork are accepted only when their URLs are
+absolute `http://` or `https://` URLs. The widget checks image URLs again before
+using them; invalid or unsupported image URLs are not displayed.
+
+Card buttons always display their configured title. When clicked:
+
+- If the postback is absent or exactly empty, the title is sent as a chat message.
+- A non-empty absolute HTTP(S), `mailto:`, or `tel:` URL opens as a destination.
+  A valid bare email address is opened as an email address.
+- Any other non-empty value is sent as chat text rather than opened as a URL. The
+  conversation bubble displays the button title, not that postback value.
+- Quick-reply postbacks are sent as chat data and are not treated as navigation
+  destinations.
+
+Destinations opened by the widget use a new browsing context with `noopener` and
+`noreferrer`. These behaviors apply to bot-provided content; host applications
+should still configure CSP for the origins they intend to permit.
+
+## Mobile applications
+
+The widget is a JavaScript embed for websites, including mobile websites. There
+are no native Android or iOS SDKs.
