@@ -1,53 +1,87 @@
 # Botfriends Agent Chat Widget
 
-The Agent Chat Widget is a JavaScript widget for embedding Botfriends X chat in a
-website. It is delivered as a browser script and exposes a JavaScript API for
-initialization, configuration, and runtime control.
+The Agent Chat Widget embeds a Botfriends X chat in your website. You add one
+script tag to your page; everything else is optional.
 
-The widget renders in a Shadow DOM to isolate its styles from the host page. The
-Shadow DOM is a styling boundary, not a security sandbox.
+This guide starts with the minimal setup and then adds one capability per step:
 
-## Add the copy script to a website
+1. [Add the embed snippet](#step-1-add-the-embed-snippet) – the chat appears on your page.
+2. [Customize the widget](#step-2-customize-the-widget) – colors, texts, and behavior.
+3. [Control the widget from your page](#step-3-control-the-widget-from-your-page) –
+   open the chat, send messages, react to events.
+4. [Initialize the widget yourself](#step-4-initialize-the-widget-yourself) – decide
+   when the widget starts.
+5. [Embed the chat in a page element](#step-5-embed-the-chat-in-a-page-element) –
+   inline or fullscreen instead of floating.
+6. [Pass user data to the bot](#step-6-pass-user-data-to-the-bot) – metadata and
+   signed metadata.
+7. [Intercept messages with hooks](#step-7-intercept-messages-with-hooks) – run
+   your own code before messages are shown or sent.
 
-Copy the embed snippet from the Botfriends X project configuration and add it to
-the page where the chat should appear. The script URL is environment-specific; use
-the exact URL supplied by Botfriends X.
+The [reference](#reference) at the end lists every option, method, and event.
+
+## Step 1: Add the embed snippet
+
+Copy the embed snippet from the Botfriends X project configuration and paste it
+into the page where the chat should appear:
 
 ```html
 <script
-        defer
-        src="https://webchat.botfriendsx.com/scripts/v1/widget.js"
-        data-webchat-id="YOUR_WEBCHAT_ID"
-        data-auto-init="true"
+  defer
+  src="https://webchat.botfriendsx.com/scripts/v1/widget.js"
+  data-webchat-id="YOUR_WEBCHAT_ID"
+  data-auto-init="true"
 ></script>
 ```
 
-The snippet:
+That is all you need. When the page loads, the chat launcher appears in the
+corner of the page with the appearance and texts configured in Botfriends X.
 
-- Loads the widget bundle from the configured widget host.
-- Identifies the Botfriends X webchat with `data-webchat-id`.
-- Enables automatic initialization when `data-auto-init` is the string `true`.
-- Lets the browser download the deferred script without blocking HTML parsing.
+What the snippet does:
 
-The bundle registers `window.BotfriendsWidgetApi`; with auto-initialization enabled,
-it also mounts the widget and exposes the mounted handle as
-`window.BotfriendsWidget`. Add the snippet once per page. Do not copy a development
-or staging script URL into production.
+- `src` loads the widget. The URL is environment-specific; use the exact URL from
+  Botfriends X and do not copy a development or staging URL into production.
+- `data-webchat-id` identifies your Botfriends X webchat.
+- `data-auto-init="true"` starts the widget automatically.
+- `defer` loads the script without blocking your page.
 
-To pass JavaScript options with the copy script, define them before the widget
-bundle runs:
+Add the snippet only once per page.
+
+### The three global objects
+
+The widget can be used without writing any JavaScript. If you do want to
+configure or control it from JavaScript, the widget uses three global objects on
+`window`. Each has its own job:
+
+| Global object                    | What it is for                                                                                                                          | Who creates it                                                          |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `window.BotfriendsWidgetOptions` | Settings for the automatically started widget ([Step 2](#step-2-customize-the-widget)).                                                 | **You**, before the widget script runs. Optional.                       |
+| `window.BotfriendsWidgetApi`     | Starts and removes the widget: `init(...)`, `destroy()` ([Step 4](#step-4-initialize-the-widget-yourself)).                             | The widget script, as soon as it has loaded.                            |
+| `window.BotfriendsWidget`        | The running widget. Use it to open the chat, send messages, and listen to events ([Step 3](#step-3-control-the-widget-from-your-page)). | The widget, each time it starts (automatically or through `init(...)`). |
+
+In short: `BotfriendsWidgetOptions` is what you **hand in**, `BotfriendsWidgetApi`
+**starts** the widget, and `BotfriendsWidget` is the **running** widget you control.
+
+There is only ever one widget per page. Starting it again replaces the previous
+one, and `window.BotfriendsWidget` then refers to the new widget.
+
+## Step 2: Customize the widget
+
+By default, the widget uses the configuration from Botfriends X. To override
+individual settings on a specific page, define `window.BotfriendsWidgetOptions`
+**before** the embed snippet:
 
 ```html
 <script>
   window.BotfriendsWidgetOptions = {
     appearance: {
-      brandColor: '#2457a6',
-      userMessageColor: '#2457a6',
+      brandColor: "#2457a6",
+      userMessageColor: "#2457a6",
     },
     localization: {
-      defaultLanguage: 'en',
+      defaultLanguage: "en",
     },
-  }
+  };
 </script>
 <script
   defer
@@ -57,149 +91,536 @@ bundle runs:
 ></script>
 ```
 
-`BotfriendsWidgetOptions` applies only when the script auto-initializes. If you
-initialize through the JavaScript API, pass the options to `init` instead.
+You only need to list the settings you want to change. Everything else keeps
+its Botfriends X value. Settings from your page take precedence over the
+Botfriends X configuration, which takes precedence over the widget's defaults.
+Invalid or unsupported settings are ignored and reported in the browser console.
 
-## Initialize through JavaScript
+All available settings are listed in the
+[configuration reference](#configuration-options).
 
-Use the API when the host page needs to control when or where the widget mounts:
+`window.BotfriendsWidgetOptions` is only read when the widget starts
+automatically. If you start the widget yourself ([Step 4](#step-4-initialize-the-widget-yourself)),
+pass the same object to `init(...)` instead.
+
+## Step 3: Control the widget from your page
+
+Once the widget has started, `window.BotfriendsWidget` gives you access to it.
+With the embed snippet from Step 1, the widget has started by the time the
+page's `DOMContentLoaded` event fires:
 
 ```html
-<script src="https://webchat.botfriendsx.com/scripts/v1/widget.js" defer></script>
+<button id="help-button">Chat with us</button>
 <script>
-  window.addEventListener('DOMContentLoaded', () => {
-    const webchatId = 'YOUR_WEBCHAT_ID'
+  window.addEventListener("DOMContentLoaded", () => {
+    const widget = window.BotfriendsWidget;
 
-    const widget = window.BotfriendsWidgetApi.init(webchatId, {
-      appearance: {
-        brandColor: '#2457a6',
-      },
-    })
-
-    widget.open({ focus: true })
-  })
+    document.getElementById("help-button").addEventListener("click", () => {
+      widget.open({ focus: true });
+    });
+  });
 </script>
 ```
 
-`init(webchatId, options?, mountOptions?)` returns a handle for the mounted widget.
-The `webchatId` is required. `options` is a partial widget configuration;
-`mountOptions` controls where and how the widget is mounted.
-
-The widget manages its own gateway session authentication. See the JWT section
-below for the distinction between its session token and the optional signed
-metadata token.
-
-### Passing user data: JWT and metadata
-
-#### JWT
-
-The widget obtains and refreshes its own gateway session JWT. This session token
-authorizes the widget's connection; it is separate from the optional
-`integration.metadataJWT` described here. The widget API does not accept a
-host-supplied identity JWT to log a user in or resume another user session.
-
-`integration.metadataJWT` is an optional signed assertion accompanying an
-outgoing message. The gateway verifies it with the signing secret configured for
-the webchat, using the `HS256` algorithm. The JWT payload must contain:
-
-- `projectId`: the ID of the Botfriends X project that owns the webchat.
-- `metadata`: a JSON object containing the verified metadata to pass to the bot.
-
-The `projectId` must match the authenticated project. The metadata object is
-limited to 16 KiB of UTF-8 JSON and eight nested object/array levels. Standard
-JWT `exp` and `nbf` claims are checked when present. The gateway does not require
-an expiration claim or impose a maximum token age; use a short expiration for
-tokens created by your application.
-
-Create the JWT on your server using the signing secret provided for the webchat
-through your Botfriends X deployment's secure setup. If your integration has not
-been given a signing secret, request it through your usual secure project
-provisioning channel. Never expose the signing secret in browser JavaScript, the
-embed snippet, or a public repository. Only the resulting signed token should be
-sent to the browser. For example, server-side code using the `jsonwebtoken`
-package can sign a short-lived token like this:
+Common actions:
 
 ```js
-const jwt = require('jsonwebtoken')
+const widget = window.BotfriendsWidget;
+
+widget.open({ focus: true }); // open the chat panel and move focus into it
+widget.close(); // close the chat panel
+widget.sendMessage("I need help with my order.");
+
+widget.hide(); // hide the whole widget, including the launcher
+widget.show(); // show it again
+```
+
+`open()`/`close()` control the chat panel. `show()`/`hide()` control whether the
+widget is visible on the page at all.
+
+To change settings while the widget is running, use `updateConfig(...)`. It
+accepts the same settings as `window.BotfriendsWidgetOptions`:
+
+```js
+window.BotfriendsWidget.updateConfig({
+  appearance: { brandColor: "#0a7d4f" },
+});
+```
+
+To react to what happens in the chat, subscribe to an event. `on(...)` returns a
+function that removes the listener again:
+
+```js
+const unsubscribe = window.BotfriendsWidget.on("message:received", (event) => {
+  console.log("Received chat message:", event.detail);
+});
+
+// Later, when you no longer need the listener:
+unsubscribe();
+```
+
+All methods and events are listed in the [JavaScript API reference](#javascript-api).
+
+## Step 4: Initialize the widget yourself
+
+Use this when your page needs to decide **when** the widget starts, for example
+only after a cookie banner was accepted or only on certain routes.
+
+Remove `data-webchat-id` and `data-auto-init` from the script tag. The script then
+only loads the widget and provides `window.BotfriendsWidgetApi`. Start the widget
+with `init(...)` when you are ready:
+
+```html
+<script
+  defer
+  src="https://webchat.botfriendsx.com/scripts/v1/widget.js"
+></script>
+<script>
+  window.addEventListener("DOMContentLoaded", () => {
+    const widget = window.BotfriendsWidgetApi.init("YOUR_WEBCHAT_ID", {
+      appearance: {
+        brandColor: "#2457a6",
+      },
+    });
+
+    widget.open({ focus: true });
+  });
+</script>
+```
+
+`init(webchatId, options?, mountOptions?)`:
+
+- `webchatId` (required): your Botfriends X webchat ID.
+- `options` (optional): the same settings as `window.BotfriendsWidgetOptions` in Step 2.
+- `mountOptions` (optional): where and how the widget is placed on the page, see
+  [Step 5](#step-5-embed-the-chat-in-a-page-element).
+
+`init(...)` returns the running widget. This is the same object that is also
+available as `window.BotfriendsWidget`, so all methods from Step 3 work on it.
+
+To remove the widget from the page, call `window.BotfriendsWidgetApi.destroy()`.
+Call `init(...)` again to start a new widget.
+
+## Step 5: Embed the chat in a page element
+
+By default, the widget floats in a corner of the page. To show the chat inside
+an element of your page instead, pass that element as `mountOptions.container`
+to `init(...)`. Embedded mode fills the element's width and height, so give the
+element a size:
+
+```html
+<div id="support-chat" class="support-chat"></div>
+<script
+  defer
+  src="https://webchat.botfriendsx.com/scripts/v1/widget.js"
+></script>
+<script>
+  window.addEventListener("DOMContentLoaded", () => {
+    const container = document.getElementById("support-chat");
+
+    const widget = window.BotfriendsWidgetApi.init(
+      "YOUR_WEBCHAT_ID",
+      {},
+      { container },
+    );
+
+    widget.open();
+  });
+</script>
+```
+
+```css
+.support-chat {
+  width: 100%;
+  height: 600px;
+}
+```
+
+For a fullscreen chat, make the container fill the viewport. There is no
+separate fullscreen setting; your page's CSS controls the size:
+
+```css
+.support-chat {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  width: 100vw;
+  height: 100dvh;
+}
+```
+
+The container must be an `HTMLElement`. In embedded mode, the launcher button is
+hidden by default; set `showLauncher: true` in `mountOptions` to display it.
+
+## Step 6: Pass user data to the bot
+
+You can send additional data about the visitor or the page along with each
+message, for example a customer number. There are two ways, which can be
+combined:
+
+- **Metadata**: plain values, set in the browser. Simple, but not verified.
+- **Signed metadata (JWT)**: values signed by your server. The gateway verifies
+  them before passing them to the bot.
+
+### Metadata
+
+Pass JSON-compatible values under `integration.metadata`:
+
+```js
+const widget = window.BotfriendsWidgetApi.init("YOUR_WEBCHAT_ID", {
+  integration: {
+    metadata: {
+      customerId: "123",
+    },
+  },
+});
+```
+
+This works the same way in `window.BotfriendsWidgetOptions` and
+`updateConfig(...)`. The widget also adds the current full page URL, including
+its query string and fragment, to outgoing messages.
+
+Things to know:
+
+- Metadata and the page URL are unsigned and visible to the receiving
+  conversation. Do not include secrets, access tokens, or other sensitive values.
+- The complete metadata object is limited to 16 KiB of UTF-8 JSON and eight
+  nested object/array levels. If your values and the page URL together exceed the
+  limit, your values are omitted for that message. If the URL alone exceeds the
+  limit, the metadata field is omitted.
+- Invalid metadata is ignored with a console warning instead of blocking a
+  message. An invalid `updateConfig(...)` call keeps the previous valid settings.
+
+### Signed metadata (JWT)
+
+Use `integration.metadataJWT` when the bot must be able to trust the values. Your
+server signs the values; the gateway verifies the signature and forwards only
+verified values to the bot.
+
+**1. Create the token on your server.** Sign it with the `HS256` algorithm using
+the signing secret for your webchat. If you have not received a signing secret,
+request it through your usual secure Botfriends X provisioning channel. Never
+put the signing secret in browser JavaScript, the embed snippet, or a public
+repository; only the signed token may be sent to the browser.
+
+The token payload must contain:
+
+- `projectId`: the ID of the Botfriends X project that owns the webchat.
+- `metadata`: a JSON object with the values to pass to the bot (same size limits
+  as above).
+
+Example using the `jsonwebtoken` package:
+
+```js
+const jwt = require("jsonwebtoken");
 
 const metadataJWT = jwt.sign(
   {
-    projectId: 'YOUR_PROJECT_ID',
+    projectId: "YOUR_PROJECT_ID",
     metadata: {
-      customerId: '123',
-      customerTier: 'gold',
+      customerId: "123",
+      customerTier: "gold",
     },
   },
   process.env.WEBCHAT_METADATA_JWT_SECRET,
   {
-    algorithm: 'HS256',
-    expiresIn: '5m',
+    algorithm: "HS256",
+    expiresIn: "5m",
   },
-)
+);
 ```
 
-Pass the resulting token to the widget as `integration.metadataJWT`:
+Standard `exp` and `nbf` claims are checked when present. The gateway does not
+require an expiration or limit the token age, so use a short expiration.
+
+**2. Pass the token to the widget:**
 
 ```js
-const widget = window.BotfriendsWidgetApi.init('YOUR_WEBCHAT_ID', {
+const widget = window.BotfriendsWidgetApi.init("YOUR_WEBCHAT_ID", {
   integration: {
     metadataJWT,
   },
-})
+});
 ```
 
-For per-message or rotating tokens, `beforeSend` can supply or replace the token
-by returning `metadataJWT` at the top level of its result, alongside `message`
-and `send`—not inside `message`. Return `null` to omit the token for that
-message, or leave the field undefined to use the configured
-`integration.metadataJWT`.
+The token is sent with each outgoing message. The gateway verifies it and
+forwards only the verified `metadata` to the bot. The token itself is not added
+to the message, stored with the conversation, or forwarded to the bot.
 
-The token accompanies each outgoing message separately from its message payload.
-The gateway verifies it and forwards only the verified `metadata` claim to the
-bot backend. The token itself is not added to the message, stored with the
-conversation, or forwarded to the bot backend.
+If the token is invalid, expired, signed with the wrong secret, or its
+`projectId` does not match the webchat's project, no verified metadata is
+forwarded. The message itself is still delivered.
 
-If the token is invalid, expired, signed with the wrong secret, or has a
-`projectId` that does not match the webchat's project, no verified metadata is
-forwarded. The message itself is still processed without that verified metadata.
+For tokens that change per message, return a fresh token from the `beforeSend`
+hook ([Step 7](#beforesend)).
 
-Do not confuse this metadata assertion with user authentication: it does not
-identify or log in the website visitor. JWT contents and any transmitted
-metadata should still be treated as visible to the browser and the receiving
-conversation.
+Signed metadata is not a login: it does not identify or authenticate the
+visitor, and its contents are still visible in the browser. The widget manages
+its own connection to the chat gateway; you do not need to provide a token for
+that.
 
-#### Metadata
+## Step 7: Intercept messages with hooks
 
-Pass optional JSON-compatible metadata under `integration.metadata` when
-initializing the widget:
+Hooks let you run your own code before a message is shown or sent. Register them
+under `integration.hooks`. Each hook has a `handler` function, which may return a
+value directly or a Promise, and an optional `timeoutMs`:
 
 ```js
-const widget = window.BotfriendsWidgetApi.init('YOUR_WEBCHAT_ID', {
+const widget = window.BotfriendsWidgetApi.init("YOUR_WEBCHAT_ID", {
   integration: {
-    metadata: {
-      customerId: '123',
+    hooks: {
+      beforeDisplay: {
+        handler: (message, { element }) => {
+          element.classList.add(`customer-message--${message.role}`);
+          return true;
+        },
+      },
+      beforeSend: {
+        handler: (message) => {
+          return {
+            message: {
+              ...message,
+              metadata: {
+                ...message.metadata,
+                custom: { source: "website" },
+              },
+            },
+            metadataJWT: getFreshMetadataJWT(), // your own function
+          };
+        },
+        timeoutMs: 3000,
+      },
     },
   },
-})
+});
 ```
 
-The same integration configuration can be supplied or changed with
-`widget.updateConfig(...)`. The widget also adds the current full page URL,
-including its query string and fragment, to outgoing messages. The complete
-metadata object is limited to 16 KiB of UTF-8 JSON and eight nested object/array
-levels.
+The two supported hooks are `beforeDisplay` and `beforeSend`.
 
-Metadata and the page URL are unsigned and visible to the receiving conversation.
-Do not include secrets, access tokens, or other sensitive values. Invalid
-metadata or integration settings are ignored with a console warning instead of
-blocking a message; an invalid configuration update keeps the previous valid
-settings. If custom values and the page URL exceed the size limit together, the
-custom values are omitted for that message. If the URL alone exceeds the limit,
-the metadata field is omitted.
+Events from Step 3 only notify you; hooks can change or stop a message.
 
-Use this method for non-sensitive values that do not need cryptographic
-verification. For signed, server-verified metadata, use `integration.metadataJWT`
-instead. The two methods serve different purposes and can be supplied together.
+### `beforeDisplay`
+
+Runs for each user, agent, and system message before it becomes visible,
+including earlier messages of the conversation and carousel cards. It runs again
+each time the message is rendered, for example when the chat is closed and
+reopened, so apply styling every time it runs.
+
+The handler receives the message and a context object. `context.element` is the
+rendered message element. Return `false` to hide the message; return `true` or
+nothing to show it.
+
+The widget renders inside a Shadow DOM, so `document.querySelector(...)` cannot
+find its elements. Use `context.element`, or query the widget's `shadowRoot`:
+
+```js
+const root = document.querySelector(
+  '[data-botfriends-widget="root"]',
+)?.shadowRoot;
+const element = root?.querySelector(
+  `[data-message-id="${CSS.escape(message.id)}"]`,
+);
+```
+
+### `beforeSend`
+
+Runs once for each outgoing message before it is sent. Return nothing to send
+the message unchanged, or an object with these optional fields:
+
+- `message`: the changed message. Only `payload`, `metadata`, `displayText`, and
+  `languageCode` are used; omitted fields keep their original values. The
+  message stays a user message and keeps its `id`. User payloads must be valid
+  text, event, or file payloads.
+- `metadataJWT`: a signed metadata token for this message only. A string replaces
+  the configured `integration.metadataJWT`, `null` sends no token, and leaving it
+  out keeps the configured token. Put it next to `message`, not inside it.
+- `send`: set to `false` to cancel sending. The message is removed from the
+  conversation and its text is put back into the input field.
+
+Invalid or oversized metadata, or an invalid payload, is ignored with a warning
+and the original message is sent. If sending has to be retried, the widget
+reuses the result and does not run the hook again.
+
+### Timeouts and errors
+
+The default timeout is three seconds; the maximum is 30 seconds. If a handler
+throws, rejects, or times out, the widget continues as if there were no hook:
+`beforeDisplay` shows the message and `beforeSend` sends the original message. A
+timeout cannot interrupt a handler that runs synchronously.
+
+### Changing hooks later
+
+`updateConfig(...)` replaces individual hooks. Set a hook to `null` to remove it;
+hooks not mentioned in the update stay registered. Unknown hook names and hooks
+without a `handler` function are ignored with a console warning. A changed
+`beforeDisplay` hook affects only messages rendered afterwards.
+
+## Demo mode
+
+Set `system.disableInteraction: true` when starting the widget to show a preview
+without a real conversation, connection, or authentication. This setting cannot
+be changed with `updateConfig(...)`; destroy the widget and start it again.
+
+In demo mode, `addMessages(messages)` and `clearMessages()` manage the preview
+content. Messages need a `role` and a matching `payload`; `id` and `createdAt`
+are generated when omitted. Preview content is never sent to the gateway.
+
+## Reference
+
+### Configuration options
+
+These settings can be used in `window.BotfriendsWidgetOptions`, in the `options`
+argument of `init(...)`, and in `updateConfig(...)`. All of them are optional.
+Nested settings are merged individually, so changing one field keeps its sibling
+fields.
+
+| Field                                                                            | Supported values                                                                  |
+| -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `name`, `description`                                                            | Configuration name and description strings.                                       |
+| `lastUpdated`                                                                    | Configuration update timestamp as a non-negative integer.                         |
+| `appearance.useAvatar`, `appearance.avatarUrl`                                   | Whether to show an avatar and its image URL.                                      |
+| `appearance.useInfoBanner`                                                       | Whether to show the information banner.                                           |
+| `appearance.brandColor`                                                          | Main brand color as a 3- or 6-digit hex color, for example `#2457a6`.             |
+| `appearance.agentMessageColor`, `appearance.userMessageColor`                    | Agent and user message colors as 3- or 6-digit hex colors.                        |
+| `launcher.useIcon`, `launcher.iconUrl`                                           | Whether to use a custom launcher icon and its URL.                                |
+| `launcher.size`                                                                  | `small`, `medium`, `large`, or a number (custom size in pixels).                  |
+| `launcher.color`                                                                 | Launcher color.                                                                   |
+| `conversation.fileUpload`                                                        | Enable or disable file upload.                                                    |
+| `conversation.languageSelection`                                                 | Enable or disable conversation language selection.                                |
+| `conversation.restartConversation`                                               | Enable or disable restarting a conversation.                                      |
+| `conversation.downloadConversation`                                              | Enable or disable conversation download.                                          |
+| `system.position`                                                                | Floating widget position: `bottom-right` or `bottom-left`.                        |
+| `system.autoMount`, `system.autoOpen`                                            | Whether the widget appears and opens automatically after configuration loads.     |
+| `system.autoWelcome`                                                             | Whether the widget sends its configured welcome event when a conversation starts. |
+| `system.isActive`                                                                | Whether the widget is available to visitors.                                      |
+| `system.disableInteraction`                                                      | Show a non-interactive preview ([Demo mode](#demo-mode)).                         |
+| `system.forcePrivacyConsent`                                                     | Require the privacy-consent screen.                                               |
+| `privacy.showPrivacyPolicy`                                                      | Show the project's privacy-consent flow when configured.                          |
+| `showPoweredByBotfriends`                                                        | Show or hide the Botfriends attribution.                                          |
+| `localization.defaultLanguage`                                                   | Default widget and conversation language.                                         |
+| `localization.projectLanguages`                                                  | Languages enabled for the project.                                                |
+| `localization.widgetLanguages`                                                   | Languages available in the widget.                                                |
+| `localization.currentWidgetLanguage`, `localization.currentConversationLanguage` | Runtime language selections.                                                      |
+| `localization.translations`                                                      | Per-language text overrides (see below).                                          |
+| `integration.metadata`, `integration.metadataJWT`                                | User data for the bot ([Step 6](#step-6-pass-user-data-to-the-bot)).              |
+| `integration.hooks`                                                              | Message hooks ([Step 7](#step-7-intercept-messages-with-hooks)).                  |
+
+A more complete example:
+
+```js
+window.BotfriendsWidgetOptions = {
+  appearance: {
+    useAvatar: true,
+    avatarUrl: "https://cdn.example.com/support-avatar.png",
+    useInfoBanner: true,
+    brandColor: "#2457a6",
+    agentMessageColor: "#f1f4f8",
+    userMessageColor: "#2457a6",
+  },
+  launcher: {
+    useIcon: false,
+    size: "medium",
+    color: "#2457a6",
+  },
+  system: {
+    position: "bottom-right",
+    autoMount: true,
+    autoOpen: false,
+  },
+  localization: {
+    defaultLanguage: "en",
+    projectLanguages: ["en", "de"],
+    widgetLanguages: ["en", "de"],
+    translations: {
+      en: {
+        "header.title": "How can we help?",
+        "header.subtitle": "Chat with our team",
+      },
+      de: {
+        "header.title": "Wie können wir helfen?",
+        "header.subtitle": "Schreiben Sie unserem Team",
+      },
+    },
+  },
+};
+```
+
+**Texts.** Every text in the widget can be overridden through
+`localization.translations`. To see all available text keys and their default
+values, call `window.BotfriendsWidgetApi.getDefaultTranslations()` in the browser
+console of a page that loads the widget.
+
+**Styling.** Only the settings above are supported. There is no custom CSS API,
+and because the widget renders in a Shadow DOM, your page's CSS cannot style the
+widget's internals.
+
+### JavaScript API
+
+#### `window.BotfriendsWidgetApi`
+
+Available as soon as the widget script has loaded.
+
+| Member                                     | Description                                                                            |
+| ------------------------------------------ | -------------------------------------------------------------------------------------- |
+| `init(webchatId, options?, mountOptions?)` | Starts the widget and returns it. Replaces a widget that is already running.           |
+| `destroy()`                                | Removes the running widget from the page.                                              |
+| `version`                                  | The version of the loaded widget script.                                               |
+| `getDefaultTranslations()`                 | Returns the widget's built-in texts for all languages, keyed by language and text key. |
+
+`mountOptions` fields:
+
+| Field          | Description                                                                                |
+| -------------- | ------------------------------------------------------------------------------------------ |
+| `container`    | An `HTMLElement` to show the chat in ([Step 5](#step-5-embed-the-chat-in-a-page-element)). |
+| `showLauncher` | Show the launcher button in embedded mode. Default: `false`.                               |
+| `openMenu`     | Show the menu initially. Intended for [demo mode](#demo-mode).                             |
+
+#### `window.BotfriendsWidget`
+
+The running widget. It is set each time the widget starts and is also the
+return value of `init(...)`.
+
+| Method                            | Description                                                                      |
+| --------------------------------- | -------------------------------------------------------------------------------- |
+| `open({ focus? }?)`               | Opens the chat panel. Set `focus: true` to move focus into the panel.            |
+| `close()`                         | Closes the chat panel.                                                           |
+| `toggle({ focus? }?)`             | Opens or closes the chat panel.                                                  |
+| `show()`                          | Makes the widget visible.                                                        |
+| `hide()`                          | Hides the widget, including the launcher.                                        |
+| `sendMessage(text)`               | Sends a text message as the visitor.                                             |
+| `updateConfig(options)`           | Changes settings of the running widget ([options](#configuration-options)).      |
+| `setWidgetLanguage(languageCode)` | Changes the language of the widget's texts.                                      |
+| `getWidgetLanguage()`             | Returns the current language of the widget's texts.                              |
+| `setConversationLanguage(code)`   | Changes the language of the conversation.                                        |
+| `getConversationLanguage()`       | Returns the current conversation language.                                       |
+| `on(eventName, listener)`         | Subscribes to an [event](#events). Returns a function that removes the listener. |
+| `destroy()`                       | Removes this widget from the page.                                               |
+| `addMessages(messages)`           | Adds preview messages. [Demo mode](#demo-mode) only.                             |
+| `clearMessages()`                 | Removes all preview messages. [Demo mode](#demo-mode) only.                      |
+
+`BotfriendsWidgetApi.destroy()` and `BotfriendsWidget.destroy()` both remove the
+running widget. The difference only matters if you keep a reference to an old
+widget: its `destroy()` does nothing once that widget has already been removed
+or replaced by a new `init(...)` call.
+
+After the widget is removed, `window.BotfriendsWidget` still points to the
+removed widget and its methods have no effect. Start a new widget with
+`init(...)` before using it again.
+
+#### Events
+
+Subscribe with `window.BotfriendsWidget.on(eventName, listener)`. The listener
+receives an event whose `detail` contains the data:
+
+| Event                         | `event.detail`                                      |
+| ----------------------------- | --------------------------------------------------- |
+| `connection:error`            | `null`                                              |
+| `message:sent`                | The submitted chat message.                         |
+| `message:received`            | The received chat message.                          |
+| `message:typing`              | Typing state information.                           |
+| `conversation:new`            | `null` when a new conversation starts.              |
+| `conversation:terminated`     | The message that could not be delivered, or `null`. |
+| `conversation:changeLanguage` | An object containing `languageCode`.                |
 
 ## Privacy, consent, and data storage
 
@@ -272,338 +693,6 @@ consent setting does not control server-side message retention. Contact your
 Botfriends X administrator to confirm the retention settings for your project
 and follow your organization's process for deletion requests.
 
-## Configuration and precedence
-
-The script accepts partial values from `BotfriendsWidgetOptions` or the `options`
-argument to `BotfriendsWidgetApi.init`. These values override the project
-configuration for the mounted widget. A runtime `widget.updateConfig(...)` call
-uses the same override layer.
-
-Configuration precedence, from highest to lowest, is:
-
-1. JavaScript options provided by the host page or `updateConfig(...)`.
-2. The Botfriends X project configuration.
-3. The widget's default values.
-
-Configuration is merged by property, so overriding one nested field does not
-replace its sibling fields. Invalid or unsupported fields are discarded and
-reported in the browser console.
-
-The supported configuration fields are:
-
-| Field                                                                            | Supported values                                                                  |
-| -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `name`, `description`                                                            | Configuration name and description strings.                                       |
-| `lastUpdated`                                                                    | Configuration update timestamp as a non-negative integer.                         |
-| `appearance.useAvatar`, `appearance.avatarUrl`                                   | Whether to show an avatar and its image URL.                                      |
-| `appearance.useInfoBanner`                                                       | Whether to show the information banner.                                           |
-| `appearance.brandColor`                                                          | Main brand color as a 3- or 6-digit hex color, for example `#2457a6`.             |
-| `appearance.agentMessageColor`, `appearance.userMessageColor`                    | Agent and user message colors as 3- or 6-digit hex colors.                        |
-| `launcher.useIcon`, `launcher.iconUrl`                                           | Whether to use a custom launcher icon and its URL.                                |
-| `launcher.size`                                                                  | `small`, `medium`, `large`, or `number` ( custom px value )                       |
-| `launcher.color`                                                                 | Launcher color.                                                                   |
-| `conversation.fileUpload`                                                        | Enable or disable file upload.                                                    |
-| `conversation.languageSelection`                                                 | Enable or disable conversation language selection.                                |
-| `conversation.restartConversation`                                               | Enable or disable restarting a conversation.                                      |
-| `conversation.downloadConversation`                                              | Enable or disable conversation download.                                          |
-| `system.position`                                                                | Floating widget position: `bottom-right` or `bottom-left`.                        |
-| `system.autoMount`, `system.autoOpen`                                            | Whether the widget appears and opens automatically after configuration loads.     |
-| `system.autoWelcome`                                                             | Whether the widget sends its configured welcome event when a conversation starts. |
-| `system.isActive`                                                                | Whether the widget is available to visitors.                                      |
-| `system.disableInteraction`                                                      | Render a non-interactive demo preview instead of starting a chat session.         |
-| `system.forcePrivacyConsent`                                                     | Require the privacy-consent screen.                                               |
-| `privacy.showPrivacyPolicy`                                                      | Show the project's privacy-consent flow when configured.                          |
-| `showPoweredByBotfriends`                                                        | Show or hide the Botfriends attribution.                                          |
-| `localization.defaultLanguage`                                                   | Default widget and conversation language.                                         |
-| `localization.projectLanguages`                                                  | Languages enabled for the project.                                                |
-| `localization.widgetLanguages`                                                   | Languages available in the widget.                                                |
-| `localization.currentWidgetLanguage`, `localization.currentConversationLanguage` | Runtime language selections.                                                      |
-| `localization.translations`                                                      | Per-language translation overrides.                                               |
-
-For example:
-
-```js
-const widgetOptions = {
-  appearance: {
-    useAvatar: true,
-    avatarUrl: 'https://cdn.example.com/support-avatar.png',
-    useInfoBanner: true,
-    brandColor: '#2457a6',
-    agentMessageColor: '#f1f4f8',
-    userMessageColor: '#2457a6',
-  },
-  launcher: {
-    useIcon: false,
-    size: 'medium',
-    color: '#2457a6',
-  },
-  system: {
-    position: 'bottom-right',
-    autoMount: true,
-    autoOpen: false,
-  },
-  localization: {
-    defaultLanguage: 'en',
-    projectLanguages: ['en', 'de'],
-    widgetLanguages: ['en', 'de'],
-    translations: {
-      en: {
-        'header.title': 'How can we help?',
-        'header.subtitle': 'Chat with our team',
-      },
-      de: {
-        'header.title': 'Wie können wir helfen?',
-        'header.subtitle': 'Schreiben Sie unserem Team',
-      },
-    },
-  },
-}
-
-const widget = window.BotfriendsWidgetApi.init('YOUR_WEBCHAT_ID', widgetOptions)
-```
-
-The configurable translation keys are all from `getDefaultTranslations()`.
-`getDefaultTranslations()` returns the widget's built-in translation catalogs.
-
-Supported settings are limited to the configuration fields above. The widget does
-not provide a public custom CSS or arbitrary DOM styling API. Its Shadow DOM
-prevents host-page CSS from styling widget internals.
-
-## Embedded mode and fullscreen layouts
-
-Pass an existing HTML element as `mountOptions.container` to embed the widget
-inside that element instead of mounting it as a floating widget on `document.body`.
-The container must be an `HTMLElement`. Embedded mode fills the container's width
-and height, so set its dimensions in the host page.
-
-```html
-<div id="support-chat" class="support-chat"></div>
-<script src="https://webchat.botfriendsx.com/scripts/v1/widget.js" defer></script>
-<script>
-  window.addEventListener('DOMContentLoaded', () => {
-    const container = document.getElementById('support-chat')
-
-    const widget = window.BotfriendsWidgetApi.init(
-      'YOUR_WEBCHAT_ID',
-      {},
-      {
-        container,
-        showLauncher: false,
-      },
-    )
-
-    widget.open()
-  })
-</script>
-```
-
-```css
-.support-chat {
-  width: 100%;
-  height: 600px;
-}
-```
-
-For a fullscreen embedded chat, size and position the host container to fill the
-viewport. Fullscreen is controlled by the host page's container CSS; there is no
-separate fullscreen configuration flag.
-
-```css
-.support-chat {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  width: 100vw;
-  height: 100dvh;
-}
-```
-
-In embedded mode, the launcher is hidden by default. Set `showLauncher: true` in
-`mountOptions` to display it. `openMenu` is another optional mount option for
-showing the menu initially in demo mode.
-
-## JavaScript API
-
-The bundle exposes `window.BotfriendsWidgetApi`:
-
-| API                                        | Description                                               |
-| ------------------------------------------ | --------------------------------------------------------- |
-| `init(webchatId, options?, mountOptions?)` | Mounts the widget and returns a `BotfriendsWidgetHandle`. |
-| `destroy()`                                | Destroys the currently mounted widget.                    |
-| `version`                                  | The loaded widget bundle's version string.                |
-| `getDefaultTranslations()`                 | Returns the default translation catalogs.                 |
-
-The returned handle is also available as `window.BotfriendsWidget` after mounting:
-
-| Handle method             | Description                                                               |
-| ------------------------- | ------------------------------------------------------------------------- |
-| `open({ focus? }?)`       | Opens the chat panel. Set `focus: true` to move focus into the panel.     |
-| `close()`                 | Closes the chat panel.                                                    |
-| `toggle({ focus? }?)`     | Opens or closes the chat panel.                                           |
-| `show()`                  | Makes the widget visible.                                                 |
-| `hide()`                  | Hides the widget.                                                         |
-| `sendMessage(message)`    | Submits a text message through the widget.                                |
-| `updateConfig(config)`    | Applies partial JavaScript configuration overrides to the mounted widget. |
-| `destroy()`               | Unmounts the widget and removes its host element.                         |
-| `on(eventName, listener)` | Subscribes to a supported widget event. Returns an unsubscribe function.  |
-| `addMessages(messages)`   | Adds preview messages in demo mode only.                                  |
-| `clearMessages()`         | Clears preview messages in demo mode only.                                |
-
-`show()`/`hide()` control widget visibility. `open()`/`close()` control the
-conversation panel. For example:
-
-```js
-const widget = window.BotfriendsWidget
-
-widget.open({ focus: true })
-widget.sendMessage('I need help with my order.')
-widget.close()
-
-// Remove an event listener when it is no longer needed.
-const unsubscribe = widget.on('message:received', event => {
-  console.log('Received chat message:', event.detail)
-})
-unsubscribe()
-```
-
-### Available events
-
-`on` supports these widget events:
-
-| Event                         | `event.detail`                                      |
-| ----------------------------- | --------------------------------------------------- |
-| `connection:error`            | `null`                                              |
-| `message:sent`                | The submitted chat message.                         |
-| `message:received`            | The received chat message.                          |
-| `message:typing`              | Typing state information.                           |
-| `conversation:new`            | `null` when a new conversation starts.              |
-| `conversation:terminated`     | The message that could not be delivered, or `null`. |
-| `conversation:changeLanguage` | An object containing `languageCode`.                |
-
-These are notifications, not message-interception hooks. The integration hooks
-below allow code to run before a message is displayed or sent.
-
-## Hooks
-
-Register hooks under `integration.hooks`. Each hook definition has a `handler`
-function, which may return synchronously or return a Promise, and an optional
-`timeoutMs`.
-
-```js
-const widget = window.BotfriendsWidgetApi.init('YOUR_WEBCHAT_ID', {
-  integration: {
-    hooks: {
-      beforeDisplay: {
-        handler: (message, { element }) => {
-          element.classList.add(`customer-message--${message.role}`)
-          return true
-        },
-      },
-      beforeSend: {
-        handler: message => {
-          const tokenForThisMessage = getFreshMetadataJWT()
-
-          return {
-            message: {
-              ...message,
-              metadata: {
-                ...message.metadata,
-                custom: { source: 'website' },
-              },
-            },
-            metadataJWT: tokenForThisMessage,
-          }
-        },
-        timeoutMs: 3000,
-      },
-    },
-  },
-})
-```
-
-The widget renders inside a Shadow DOM. `beforeDisplay` receives the message
-element as `context.element`, which is the simplest way to style it. If you need
-to find an element yourself, query the widget's `shadowRoot` as shown below;
-`document.querySelector(...)` cannot select elements inside that root.
-
-```js
-const root = document.querySelector('[data-botfriends-widget="root"]')?.shadowRoot
-const element = root?.querySelector(`[data-message-id="${CSS.escape(message.id)}"]`)
-```
-
-### `beforeDisplay`
-
-`beforeDisplay` runs for each user, agent, and system message before it becomes
-visible. This includes historical messages and carousel cards as they arrive. It
-runs each time the message is rendered, such as when the chat is closed and
-reopened. The hook receives a context object with the rendered message element
-as `context.element`; it can also be found by its `data-message-id` attribute
-within the widget's shadow root.
-
-Return `false` to suppress the message; return `true` or `undefined` to display
-it. For example, the registration snippet above adds a host-specific class to
-the message element. Because rendering can happen again, apply styling each time
-the hook runs.
-
-### `beforeSend`
-
-`beforeSend` runs once for each outgoing message before its first transport
-attempt. It may return `{ message?, send? }`; returning `undefined` sends the
-original message. Set `send: false` to cancel sending, remove the optimistic
-message from the conversation, and restore its text to the composer.
-
-The result may contain `message`, `metadataJWT`, and `send` as top-level fields.
-The final message remains a user message and keeps its original `id` and
-idempotency key. Only `payload`, `metadata`, `displayText`, and `languageCode`
-are read from the returned `message`; omitted fields keep their original values
-and other keys are dropped. The top-level `metadataJWT` is not part of the
-message payload: a string overrides the configured token for this message,
-`null` omits it, and `undefined` keeps the configured token. User payloads must
-be valid text, event, or file payloads. Invalid or oversized metadata, or an
-invalid payload, is ignored with a warning and the original message is sent.
-Retries reuse the finalized message and selected token without running the hook
-again.
-
-The example in the hook registration snippet adds custom metadata to an outgoing
-message.
-
-### Timeouts and errors
-
-The default hook timeout is three seconds and the maximum is 30 seconds. A
-thrown error, rejected Promise, or timeout fails open: `beforeDisplay` allows
-the message to display, and `beforeSend` sends the original message. A timeout
-cannot interrupt a synchronously running handler; it only bounds asynchronous
-waiting.
-
-### Updating hooks
-
-`updateConfig(...)` replaces individual hook definitions. Set a hook to `null`
-to remove it; hooks omitted from the update remain registered. Unknown hook
-names and definitions without a `handler` function are ignored with a console
-warning. A `beforeDisplay` update affects messages rendered after the update,
-not messages already rendered.
-
-### Other hooks
-
-The currently supported integration hooks are `beforeDisplay` and `beforeSend`,
-described above. No other integration hooks are exposed by this widget API.
-
-### Demo mode
-
-Set `system.disableInteraction: true` when initializing to render a preview without
-authentication, a WebSocket connection, or a real conversation. The mode cannot be
-changed with `updateConfig`; destroy and remount the widget to change it.
-
-In demo mode, `addMessages(messages)` and `clearMessages()` manage preview content.
-Messages require a `role` and a compatible `payload`; optional `id` and `createdAt`
-values are generated locally when omitted. Preview content is visual only and is
-not sent to the gateway.
-
-## Mobile applications
-
-The product provides a JavaScript embed for websites, including mobile websites.
-It does not provide native Android or iOS SDKs.
-
 ## Content security policy and bot-provided URLs
 
 The widget runs in the embedding page's document and renders inside a Shadow DOM.
@@ -637,3 +726,8 @@ Card buttons always display their configured title. When clicked:
 Destinations opened by the widget use a new browsing context with `noopener` and
 `noreferrer`. These behaviors apply to bot-provided content; host applications
 should still configure CSP for the origins they intend to permit.
+
+## Mobile applications
+
+The widget is a JavaScript embed for websites, including mobile websites. There
+are no native Android or iOS SDKs.
