@@ -75,13 +75,13 @@ individual settings on a specific page, define `window.BotfriendsWidgetOptions`
 <script>
   window.BotfriendsWidgetOptions = {
     appearance: {
-      brandColor: "#2457a6",
-      userMessageColor: "#2457a6",
+      brandColor: '#2457a6',
+      userMessageColor: '#2457a6',
     },
     localization: {
-      defaultLanguage: "en",
+      defaultLanguage: 'en',
     },
-  };
+  }
 </script>
 <script
   defer
@@ -112,27 +112,27 @@ page's `DOMContentLoaded` event fires:
 ```html
 <button id="help-button">Chat with us</button>
 <script>
-  window.addEventListener("DOMContentLoaded", () => {
-    const widget = window.BotfriendsWidget;
+  window.addEventListener('DOMContentLoaded', () => {
+    const widget = window.BotfriendsWidget
 
-    document.getElementById("help-button").addEventListener("click", () => {
-      widget.open({ focus: true });
-    });
-  });
+    document.getElementById('help-button').addEventListener('click', () => {
+      widget.open({ focus: true })
+    })
+  })
 </script>
 ```
 
 Common actions:
 
 ```js
-const widget = window.BotfriendsWidget;
+const widget = window.BotfriendsWidget
 
-widget.open({ focus: true }); // open the chat panel and move focus into it
-widget.close(); // close the chat panel
-widget.sendMessage("I need help with my order.");
+widget.open({ focus: true }) // open the chat panel and move focus into it
+widget.close() // close the chat panel
+widget.sendMessage('I need help with my order.')
 
-widget.hide(); // hide the whole widget, including the launcher
-widget.show(); // show it again
+widget.hide() // hide the whole widget, including the launcher
+widget.show() // show it again
 ```
 
 `open()`/`close()` control the chat panel. `show()`/`hide()` control whether the
@@ -143,20 +143,20 @@ accepts the same settings as `window.BotfriendsWidgetOptions`:
 
 ```js
 window.BotfriendsWidget.updateConfig({
-  appearance: { brandColor: "#0a7d4f" },
-});
+  appearance: { brandColor: '#0a7d4f' },
+})
 ```
 
 To react to what happens in the chat, subscribe to an event. `on(...)` returns a
 function that removes the listener again:
 
 ```js
-const unsubscribe = window.BotfriendsWidget.on("message:received", (event) => {
-  console.log("Received chat message:", event.detail);
-});
+const unsubscribe = window.BotfriendsWidget.on('message:received', event => {
+  console.log('Received chat message:', event.detail)
+})
 
 // Later, when you no longer need the listener:
-unsubscribe();
+unsubscribe()
 ```
 
 All methods and events are listed in the [JavaScript API reference](#javascript-api).
@@ -171,20 +171,17 @@ only loads the widget and provides `window.BotfriendsWidgetApi`. Start the widge
 with `init(...)` when you are ready:
 
 ```html
-<script
-  defer
-  src="https://webchat.botfriendsx.com/scripts/v1/widget.js"
-></script>
+<script defer src="https://webchat.botfriendsx.com/scripts/v1/widget.js"></script>
 <script>
-  window.addEventListener("DOMContentLoaded", () => {
-    const widget = window.BotfriendsWidgetApi.init("YOUR_WEBCHAT_ID", {
+  window.addEventListener('DOMContentLoaded', () => {
+    const widget = window.BotfriendsWidgetApi.init('YOUR_WEBCHAT_ID', {
       appearance: {
-        brandColor: "#2457a6",
+        brandColor: '#2457a6',
       },
-    });
+    })
 
-    widget.open({ focus: true });
-  });
+    widget.open({ focus: true })
+  })
 </script>
 ```
 
@@ -210,22 +207,15 @@ element a size:
 
 ```html
 <div id="support-chat" class="support-chat"></div>
-<script
-  defer
-  src="https://webchat.botfriendsx.com/scripts/v1/widget.js"
-></script>
+<script defer src="https://webchat.botfriendsx.com/scripts/v1/widget.js"></script>
 <script>
-  window.addEventListener("DOMContentLoaded", () => {
-    const container = document.getElementById("support-chat");
+  window.addEventListener('DOMContentLoaded', () => {
+    const container = document.getElementById('support-chat')
 
-    const widget = window.BotfriendsWidgetApi.init(
-      "YOUR_WEBCHAT_ID",
-      {},
-      { container },
-    );
+    const widget = window.BotfriendsWidgetApi.init('YOUR_WEBCHAT_ID', {}, { container })
 
-    widget.open();
-  });
+    widget.open()
+  })
 </script>
 ```
 
@@ -262,18 +252,21 @@ combined:
 - **Signed metadata (JWT)**: values signed by your server. The gateway verifies
   them before passing them to the bot.
 
+To read the metadata in your agent, see
+[Accessing metadata](#accessing-metadata).
+
 ### Metadata
 
 Pass JSON-compatible values under `integration.metadata`:
 
 ```js
-const widget = window.BotfriendsWidgetApi.init("YOUR_WEBCHAT_ID", {
+const widget = window.BotfriendsWidgetApi.init('YOUR_WEBCHAT_ID', {
   integration: {
     metadata: {
-      customerId: "123",
+      customerId: '123',
     },
   },
-});
+})
 ```
 
 This works the same way in `window.BotfriendsWidgetOptions` and
@@ -303,7 +296,7 @@ request it through your usual secure Botfriends X provisioning channel. Never
 put the signing secret in browser JavaScript, the embed snippet, or a public
 repository; only the signed token may be sent to the browser.
 
-The token payload must contain:
+The token payload _must_ contain:
 
 - `projectId`: the ID of the Botfriends X project that owns the webchat.
 - `metadata`: a JSON object with the values to pass to the bot (same size limits
@@ -312,22 +305,22 @@ The token payload must contain:
 Example using the `jsonwebtoken` package:
 
 ```js
-const jwt = require("jsonwebtoken");
+const jwt = require('jsonwebtoken')
 
 const metadataJWT = jwt.sign(
   {
-    projectId: "YOUR_PROJECT_ID",
+    projectId: 'YOUR_PROJECT_ID',
     metadata: {
-      customerId: "123",
-      customerTier: "gold",
+      customerId: '123',
+      customerTier: 'gold',
     },
   },
   process.env.WEBCHAT_METADATA_JWT_SECRET,
   {
-    algorithm: "HS256",
-    expiresIn: "5m",
+    algorithm: 'HS256',
+    expiresIn: '5m',
   },
-);
+)
 ```
 
 Standard `exp` and `nbf` claims are checked when present. The gateway does not
@@ -336,11 +329,11 @@ require an expiration or limit the token age, so use a short expiration.
 **2. Pass the token to the widget:**
 
 ```js
-const widget = window.BotfriendsWidgetApi.init("YOUR_WEBCHAT_ID", {
+const widget = window.BotfriendsWidgetApi.init('YOUR_WEBCHAT_ID', {
   integration: {
     metadataJWT,
   },
-});
+})
 ```
 
 The token is sent with each outgoing message. The gateway verifies it and
@@ -359,6 +352,13 @@ visitor, and its contents are still visible in the browser. The widget manages
 its own connection to the chat gateway; you do not need to provide a token for
 that.
 
+### Accessing metadata
+
+You can read these values in your agent via system collected data:
+
+- Metadata: `{channelInformation.channelProperties.additionalInformation.metadata.<key>}`
+- Signed metadata: `{channelInformation.channelProperties.additionalInformation.verifiedMetadata.<key>}`
+
 ## Step 7: Intercept messages with hooks
 
 Hooks let you run your own code before a message is shown or sent. Register them
@@ -366,33 +366,36 @@ under `integration.hooks`. Each hook has a `handler` function, which may return 
 value directly or a Promise, and an optional `timeoutMs`:
 
 ```js
-const widget = window.BotfriendsWidgetApi.init("YOUR_WEBCHAT_ID", {
+const widget = window.BotfriendsWidgetApi.init('YOUR_WEBCHAT_ID', {
   integration: {
     hooks: {
       beforeDisplay: {
         handler: (message, { element }) => {
-          element.classList.add(`customer-message--${message.role}`);
-          return true;
+          element.classList.add(`customer-message--${message.role}`)
+          return true
         },
       },
       beforeSend: {
-        handler: (message) => {
+        handler: message => {
           return {
             message: {
               ...message,
               metadata: {
                 ...message.metadata,
-                custom: { source: "website" },
+                custom: {
+                  ...message.metadata?.custom,
+                  source: 'website',
+                },
               },
             },
             metadataJWT: getFreshMetadataJWT(), // your own function
-          };
+          }
         },
         timeoutMs: 3000,
       },
     },
   },
-});
+})
 ```
 
 The two supported hooks are `beforeDisplay` and `beforeSend`.
@@ -414,12 +417,8 @@ The widget renders inside a Shadow DOM, so `document.querySelector(...)` cannot
 find its elements. Use `context.element`, or query the widget's `shadowRoot`:
 
 ```js
-const root = document.querySelector(
-  '[data-botfriends-widget="root"]',
-)?.shadowRoot;
-const element = root?.querySelector(
-  `[data-message-id="${CSS.escape(message.id)}"]`,
-);
+const root = document.querySelector('[data-botfriends-widget="root"]')?.shadowRoot
+const element = root?.querySelector(`[data-message-id="${CSS.escape(message.id)}"]`)
 ```
 
 ### `beforeSend`
@@ -511,38 +510,38 @@ A more complete example:
 window.BotfriendsWidgetOptions = {
   appearance: {
     useAvatar: true,
-    avatarUrl: "https://cdn.example.com/support-avatar.png",
+    avatarUrl: 'https://cdn.example.com/support-avatar.png',
     useInfoBanner: true,
-    brandColor: "#2457a6",
-    agentMessageColor: "#f1f4f8",
-    userMessageColor: "#2457a6",
+    brandColor: '#2457a6',
+    agentMessageColor: '#f1f4f8',
+    userMessageColor: '#2457a6',
   },
   launcher: {
     useIcon: false,
-    size: "medium",
-    color: "#2457a6",
+    size: 'medium',
+    color: '#2457a6',
   },
   system: {
-    position: "bottom-right",
+    position: 'bottom-right',
     autoMount: true,
     autoOpen: false,
   },
   localization: {
-    defaultLanguage: "en",
-    projectLanguages: ["en", "de"],
-    widgetLanguages: ["en", "de"],
+    defaultLanguage: 'en',
+    projectLanguages: ['en', 'de'],
+    widgetLanguages: ['en', 'de'],
     translations: {
       en: {
-        "header.title": "How can we help?",
-        "header.subtitle": "Chat with our team",
+        'header.title': 'How can we help?',
+        'header.subtitle': 'Chat with our team',
       },
       de: {
-        "header.title": "Wie können wir helfen?",
-        "header.subtitle": "Schreiben Sie unserem Team",
+        'header.title': 'Wie können wir helfen?',
+        'header.subtitle': 'Schreiben Sie unserem Team',
       },
     },
   },
-};
+}
 ```
 
 **Texts.** Every text in the widget can be overridden through
